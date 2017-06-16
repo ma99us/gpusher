@@ -35,9 +35,47 @@ public class GitRunner {
     static List<String> listChangedFiles() throws IOException {
         BufferedReader input = null, err = null;
         List<String> files = new ArrayList<String>();
-        runCommand("git status", new CommandOutputParser() {
+        runCommand("git status",  new CommandOutputParser() {
+            int section = 0;
+            boolean ready = false;
             @Override
             public boolean parseLine(String line) {
+                if(line.indexOf("Changes to be committed:")>=0){
+                    section = 1;
+                }
+                else if(line.indexOf("Changes not staged for commit:")>=0){
+                    section = 2;
+                }
+                else if(line.indexOf("Untracked files:")>=0){
+                    section = 3;
+                }
+
+                if(line.trim().isEmpty() && !ready && section > 0){
+                    ready = true;
+                }
+                else if(line.trim().isEmpty() && ready && section > 0){
+                    ready = false;
+                }
+
+                if(ready && section == 1 && !line.trim().isEmpty()){
+                    // new/added files
+                    String head = "new file:";
+                    int p0 = line.indexOf(head);
+                    String file =  line.substring(p0+head.length()).trim();
+                    files.add(file);
+                }
+                else if(ready && section == 2 && !line.trim().isEmpty()){
+                    // modified files
+                    String head = "modified:";
+                    int p0 = line.indexOf(head);
+                    String file =  line.substring(p0+head.length()).trim();
+                    files.add(file);
+                }
+                else if(ready && section == 3 && !line.trim().isEmpty()){
+                    // untracked files
+                    String file =  line.trim();
+                    files.add(file);
+                }
 //                    String[] tokens = line.split("\\s+");
 //                    if (tokens.length < 6)
 //                        continue;
