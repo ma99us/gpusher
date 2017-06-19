@@ -13,76 +13,33 @@ import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
+import org.maggus.gpusher.GitRunner.GitFile;
+import org.maggus.gpusher.GitRunner.GitBranch;
 
 /**
  * Created by Mike on 2017-06-14.
  */
 public class Main extends JFrame {
 
-    class Config {
-        public static final String APP_DIR = ".gpshr";
-        public static final String CONFIG_FILE_NAME = "gpshr.properties";
+    class AppConfig extends Config {
+        GitBranch curBranch;
+        List<GitFile> selectedFiles;
+        String newBranchPrefix;
 
-
-        public File getUserDir() {
-            JFileChooser fr = new JFileChooser();
-            FileSystemView fw = fr.getFileSystemView();
-            return fw.getDefaultDirectory();
+        public AppConfig() {
+            super("gpshr");
+            configComment = "This is a G-Pusher configuration file";
         }
 
-        private void loadConfig() {
-            File prefDir = new File(getUserDir(), APP_DIR);
-            if (!prefDir.exists() || !prefDir.isDirectory())
-                prefDir.mkdirs();
-            File propFile = new File(prefDir, CONFIG_FILE_NAME);
-            if (!propFile.exists() || !propFile.canRead()) {
-                System.err.println("! no config file " + propFile.getAbsolutePath()); // _DEBUG
-                return;
-            }
-            try {
-                Properties props = new Properties();
-                props.load(new FileReader(propFile));
-
-//                String selectedNetIfaceName = props.getProperty("VPN_NET_IFACE_NAME");
-//                if(selectedNetIfaceName != null && !selectedNetIfaceName.isEmpty())
-//                    selectedNetIface = new NetIface(selectedNetIfaceName, null);
-//
-//                selectedProcs.clear();
-//                String configItemsNum = props.getProperty("PROCS_NUM");
-//                int itemsNum = configItemsNum != null ? Integer.parseInt(configItemsNum) : 0;
-//                for (int i = 1; i <= itemsNum; i++) {
-//                    String nameVal = props.getProperty("PROC_NAME_" + i);
-//                    if (nameVal == null)
-//                        continue;
-//                    selectedProcs.add(new Proc(nameVal, null));
-//                }
-            } catch (FileNotFoundException e) {
-                System.err.println("! no config file " + propFile.getAbsolutePath() + "; " + e); // _DEBUG
-            } catch (IOException e) {
-                System.err.println("! can not read config file " + propFile.getAbsolutePath() + "; " + e); // _DEBUG
-            }
+        @Override
+        void onLoad(Properties props) {
+            newBranchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
         }
 
-        private void saveConfig() {
-            File prefDir = new File(getUserDir(), APP_DIR);
-            if (!prefDir.exists() || !prefDir.isDirectory())
-                prefDir.mkdirs();
-            File propFile = new File(prefDir, CONFIG_FILE_NAME);
-            try {
-                Properties props = new Properties();
-
-//                props.setProperty("VPN_NET_IFACE_NAME", selectedNetIface != null ? selectedNetIface.name : "");
-//
-//                props.setProperty("PROCS_NUM", Integer.toString(selectedProcs.size()));
-//                int i = 1;
-//                for (Proc entry : selectedProcs) {
-//                    props.setProperty("PROC_NAME_" + i, entry.name);
-//                    i++;
-//                }
-                props.store(new FileWriter(propFile), "This is a VPN Kill Switch config file");
-            } catch (IOException e) {
-                System.err.println("! can not save config file " + propFile.getAbsolutePath() + "; " + e); // _DEBUG
-            }
+        @Override
+        void onSave(Properties props) {
+            if(newBranchPrefix != null)
+                props.setProperty("NEW_BRANCH_PREFIX", newBranchPrefix);
         }
     }
 
@@ -110,11 +67,16 @@ public class Main extends JFrame {
     static PrintStream out = System.out;        // #debug
     static SimpleDateFormat sdf = new SimpleDateFormat("yyyy.MM.dd HH.mm.ss");
 
-    Config config = new Config();
+    AppConfig config = new AppConfig();
     volatile boolean dataDone;
 
     JList changesList;
     JLabel selectedLbl;
+    JTextField curBranchTxt;
+    JTextArea commitCommentTxt;
+    JCheckBox newBranchCb;
+    JTextField branchPrefixTxt;
+    JTextField newBranchTxt;
     JTextPane logTa;
 
     public Main() throws HeadlessException {
@@ -160,25 +122,103 @@ public class Main extends JFrame {
         contentPane.setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(2, 2, 2, 2);
-        gbc.weightx = 0;
-        gbc.weighty = 0;
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.gridwidth = 2;
         gbc.gridx = 0;
         gbc.gridy = 0;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        JButton refreshBtn = new JButton("Refresh");
+        refreshBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                updateGitStatus();
+            }
+        });
+        contentPane.add(refreshBtn, gbc);
+
+        gbc.anchor = GridBagConstraints.LINE_START;
+        gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(new JLabel("Select changed files to commit"), gbc);
+        contentPane.add(new JLabel("Current branch: "), gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        curBranchTxt = new JTextField(40);
+        //curBranchTxt.setEnabled(false);
+        curBranchTxt.setEditable(false);
+        contentPane.add(curBranchTxt, gbc);
+
+        gbc.weightx = 1.0;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(new JLabel("Select files to commit"), gbc);
+
+        gbc.gridwidth = 2;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
         gbc.weighty = 0.6;
         gbc.fill = GridBagConstraints.BOTH;
         contentPane.add(new JScrollPane(changesList), gbc);
+
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        selectedLbl = new JLabel("Processes selected: <none>");
+        selectedLbl = new JLabel("Selected: <none>");
         contentPane.add(selectedLbl, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(new JLabel("Commit comment:"), gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 1.0;
+        gbc.weighty = 0.2;
+        gbc.fill = GridBagConstraints.BOTH;
+        commitCommentTxt = new JTextArea(40, 3);
+        contentPane.add(new JScrollPane(commitCommentTxt), gbc);
+
+        gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        newBranchCb = new JCheckBox("Commit to new brunch with prefix:");
+        newBranchCb.setBorder(BorderFactory.createEmptyBorder());
+        contentPane.add(newBranchCb, gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        branchPrefixTxt = new JTextField(40);
+        contentPane.add(branchPrefixTxt, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(new JLabel("New branch: "), gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        newBranchTxt = new JTextField(40);
+        //curBranchTxt.setEnabled(false);
+        newBranchTxt.setEditable(false);
+        contentPane.add(newBranchTxt, gbc);
+
+        gbc.gridwidth = 2;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
@@ -202,7 +242,9 @@ public class Main extends JFrame {
     }
 
     public void updateGUI() {
-        // TODO: 2017-06-14 update gui widgets
+        if(config.curBranch != null){
+            curBranchTxt.setText(config.curBranch.name);
+        }
     }
 
     public void checkGit() {
@@ -219,20 +261,29 @@ public class Main extends JFrame {
         boolean updated = false;
         try {
             dataDone = false;
-            List<String> procs = GitRunner.listChangedFiles();
+            // git branch
+            List<GitBranch> branches = GitRunner.listBranches();
+            for(GitBranch b : branches){
+                if(b.current){
+                    config.curBranch = b;
+                    break;
+                }
+            }
+            // git status
+            List<GitFile> files = GitRunner.listChangedFiles();
             //if(lastProcs == null || !lastProcs.equals(procs))
             {
-                Collections.sort(procs, new Comparator<String>() {        // sort processes alphabetically
-                    @Override
-                    public int compare(String o1, String o2) {
-                        return o1.compareTo(o2);
-                    }
-                });
-                DefaultListModel procsModel = new DefaultListModel<String>();
-                for (String proc : procs) {
-                    procsModel.addElement(proc);
+//                Collections.sort(procs, new Comparator<String>() {        // sort processes alphabetically
+//                    @Override
+//                    public int compare(String o1, String o2) {
+//                        return o1.compareTo(o2);
+//                    }
+//                });
+                DefaultListModel filesModel = new DefaultListModel<String>();
+                for (GitFile file : files) {
+                    filesModel.addElement(file);
                 }
-                changesList.setModel(procsModel);
+                changesList.setModel(filesModel);
                 // restore marked items
 //                for (int i = 0; i < procsModel.getSize(); i++) {
 //                    Proc o = (Proc) procsModel.get(i);

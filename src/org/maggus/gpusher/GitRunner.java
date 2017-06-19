@@ -26,7 +26,7 @@ public class GitRunner {
         StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
             @Override
-            public boolean parseLine(String line) {
+            public boolean parseOutLine(String line) {
                 sb.append(line + "\n");
                 return true;
             }
@@ -39,12 +39,12 @@ public class GitRunner {
         List<GitBranch> list = new ArrayList<GitBranch>();
         runCommand("git branch", new CommandOutputParser() {
             @Override
-            public boolean parseLine(String line) {
+            public boolean parseOutLine(String line) {
                 String name = line.trim();
                 Boolean current = false;
-                if(line.startsWith("*")){
-                  name = line.substring(1).trim();
-                  current = true;
+                if (line.startsWith("*")) {
+                    name = line.substring(1).trim();
+                    current = true;
                 }
                 GitBranch b = new GitBranch(name);
                 b.current = current;
@@ -62,76 +62,88 @@ public class GitRunner {
         String command = "git checkout " + (isNew ? "-b " : "") + "\"" + brName + "\"";
         runCommand(command, new CommandOutputParser() {
             @Override
-            public boolean parseLine(String line) {
-                if(line.startsWith("Already on ")){
-                  GitBranch b = new GitBranch(brName);
-                  b.current = true;
-                  list.add(b);
-                  return false;
+            public boolean parseOutLine(String line) {
+                if (line.startsWith("Already on ")) {
+                    GitBranch b = new GitBranch(brName);
+                    b.current = true;
+                    list.add(b);
+                    return true;
+                } else if (line.startsWith("Switched to branch ")) {
+                    GitBranch b = new GitBranch(brName);
+                    b.current = true;
+                    list.add(b);
+                    return true;
+                } else if (line.startsWith("Switched to a new branch ")) {
+                    GitBranch b = new GitBranch(brName);
+                    b.current = true;
+                    list.add(b);
+                    return true;
                 }
-                else if(line.startsWith("Switched to branch ")){
-                  GitBranch b = new GitBranch(brName);
-                  b.current = true;
-                  list.add(b);
-                  return false;
+                return false;
+            }
+            @Override
+            public boolean parseErrorLine(String line) {
+                if (line.startsWith("Already on ")) {
+                    GitBranch b = new GitBranch(brName);
+                    b.current = true;
+                    list.add(b);
+                    return true;
                 }
-                else if(line.startsWith("Switched to a new branch ")){
-                  GitBranch b = new GitBranch(brName);
-                  b.current = true;
-                  list.add(b);
-                  return false;
-                }
-                return true;
+                return false;
             }
         });
-        if(list.isEmpty())
-          throw new IIOException("Branching failed");
+        if (list.isEmpty())
+            throw new IIOException("Branching failed");
         return list.get(0);
     }
-    
-    static List<String> listChangedFiles() throws IOException {
+
+    static List<GitFile> listChangedFiles() throws IOException {
         BufferedReader input = null, err = null;
-        List<String> files = new ArrayList<String>();
-        runCommand("git status",  new CommandOutputParser() {
+        List<GitFile> files = new ArrayList<GitFile>();
+        runCommand("git status", new CommandOutputParser() {
             int section = 0;
             boolean ready = false;
+
             @Override
-            public boolean parseLine(String line) {
-                if(line.indexOf("Changes to be committed:")>=0){
+            public boolean parseOutLine(String line) {
+                if (line.indexOf("Changes to be committed:") >= 0) {
                     section = 1;
-                }
-                else if(line.indexOf("Changes not staged for commit:")>=0){
+                } else if (line.indexOf("Changes not staged for commit:") >= 0) {
                     section = 2;
-                }
-                else if(line.indexOf("Untracked files:")>=0){
+                } else if (line.indexOf("Untracked files:") >= 0) {
                     section = 3;
                 }
 
-                if(line.trim().isEmpty() && !ready && section > 0){
+                if (line.trim().isEmpty() && !ready && section > 0) {
                     ready = true;
-                }
-                else if(line.trim().isEmpty() && ready && section > 0){
+                } else if (line.trim().isEmpty() && ready && section > 0) {
                     ready = false;
                 }
 
-                if(ready && section == 1 && !line.trim().isEmpty()){
+                if (ready && section == 1 && !line.trim().isEmpty()) {
                     // new/added files
                     String head = "new file:";
                     int p0 = line.indexOf(head);
-                    String file =  line.substring(p0+head.length()).trim();
-                    files.add(file);
-                }
-                else if(ready && section == 2 && !line.trim().isEmpty()){
+                    String file = line.substring(p0 + head.length()).trim();
+                    GitFile f = new GitFile(file);
+                    f.type = GitFile.Type.NEW;
+                    files.add(f);
+                    return true;
+                } else if (ready && section == 2 && !line.trim().isEmpty()) {
                     // modified files
                     String head = "modified:";
                     int p0 = line.indexOf(head);
-                    String file =  line.substring(p0+head.length()).trim();
-                    files.add(file);
-                }
-                else if(ready && section == 3 && !line.trim().isEmpty()){
+                    String file = line.substring(p0 + head.length()).trim();
+                    GitFile f = new GitFile(file);
+                    f.type = GitFile.Type.MODIFIED;
+                    files.add(f);
+                    return true;
+                } else if (ready && section == 3 && !line.trim().isEmpty()) {
                     // untracked files
-                    String file =  line.trim();
-                    files.add(file);
+                    String file = line.trim();
+                    GitFile f = new GitFile(file);
+                    files.add(f);
+                    return true;
                 }
 //                    String[] tokens = line.split("\\s+");
 //                    if (tokens.length < 6)
@@ -151,16 +163,16 @@ public class GitRunner {
 //                    Proc t = new Proc(task, pid.toString());
                 //out.println(t);
                 //files.add(t);
-                return true;
+                return false;
             }
         });
         return files;
     }
-    
+
     static void addFiles(List<GitFile> files) throws IOException {
-      for(GitFile file : files){
-        runCommand("git add \"" + file.path + "\"", null);
-      }
+        for (GitFile file : files) {
+            runCommand("git add \"" + file.path + "\"", null);
+        }
     }
 
     static void commit(String comment) throws IOException {
@@ -169,46 +181,43 @@ public class GitRunner {
 
     static void push(String brName) throws IOException {
         runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
-          @Override
-          public boolean parseLine(String line) {
-            if(line.startsWith("Branch test set up to track remote branch")){
-              // all good
-              return false;
+            @Override
+            public boolean parseOutLine(String line) {
+                if (line.startsWith("Branch " + brName + " set up to track remote branch")) {
+                    // all good
+                    return true;
+                }
+                return false;
             }
-            return true;
-          }
         });
     }
-    
+
     static public void runCommand(String command, CommandOutputParser outClbk) throws IOException {
+        System.out.println("runCommand: " + command); // #debug
         BufferedReader input = null, err = null;
         try {
-            List<String> files = new ArrayList<String>();
             String line;
             Process p = Runtime.getRuntime().exec(command);
+            // read standard output
             input = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            boolean wasOutput = false;
             while ((line = input.readLine()) != null) {
-                wasOutput = true;
-                if(outClbk != null){
-                    if(!outClbk.parseLine(line))
-                        break;
-                }
-                else{
-                  System.out.println(line); // #debug
+                if (outClbk == null || !outClbk.parseOutLine(line)) {
+                    // just log unhandled lines
+                    System.out.println("> " + line); // #debug
                 }
             }
-            if (!wasOutput) {
-                err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-                StringBuilder sb = new StringBuilder();
-                while ((line = err.readLine()) != null) {
-                    //System.err.println(line); // #debug
+            // read error output
+            err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            StringBuilder sb = new StringBuilder();
+            while ((line = err.readLine()) != null) {
+                //System.err.println(line); // #debug
+                if (outClbk == null || !outClbk.parseErrorLine(line)) {
                     sb.append(line + "\n");
                 }
-                String errors = sb.toString().trim();
-                if(errors != null && !errors.isEmpty()){
-                    throw new IOException(sb.toString().trim());
-                }
+            }
+            String errors = sb.toString().trim();
+            if (errors != null && !errors.isEmpty()) {
+                throw new IOException(sb.toString().trim());
             }
         } finally {
             if (input != null)
@@ -218,132 +227,141 @@ public class GitRunner {
         }
     }
 
-    public static String buildBranchName(String prefix, String comment){
-      StringBuilder sb = new StringBuilder();
-      if(prefix != null && !prefix.isEmpty()){
-        sb.append(prefix.trim());
-        if(!prefix.endsWith("/")){
-          sb.append("/");
+    public static String buildBranchName(String prefix, String comment) {
+        StringBuilder sb = new StringBuilder();
+        if (prefix != null && !prefix.isEmpty()) {
+            sb.append(prefix.trim());
+            if (!prefix.endsWith("/")) {
+                sb.append("/");
+            }
         }
-      }
-      comment = comment.trim().replaceAll("\\s+", "_");
-      comment = comment.replaceAll("[.,;]", "");
-      sb.append(comment);
-      return sb.toString().trim();
+        comment = comment.trim().replaceAll("\\s+", "_");
+        comment = comment.replaceAll("[.,;]", "");
+        sb.append(comment);
+        return sb.toString().trim();
     }
-    
-    public static interface CommandOutputParser{
-        public boolean parseLine(String line);
+
+    public static abstract class CommandOutputParser {
+        boolean parseOutLine(String line){
+            return false;   // not handled
+        }
+
+        boolean parseErrorLine(String line){
+            return false;   // not handled
+        }
     }
-    
+
     static class GitFile {
-      enum Type {
-        NEW, MODIFIED, IGNORED
-      };
-      public final String path;
-      public Type type;
-      public boolean selected;
+        enum Type {
+            NEW, MODIFIED, IGNORED
+        }
 
-      public GitFile(String path) {
-        this.path = path;
-      }
+        ;
+        public final String path;
+        public Type type;
+        public boolean selected;
 
-      @Override
-      public int hashCode() {
-        int hash = 5;
-        hash = 73 * hash + Objects.hashCode(this.path);
-        return hash;
-      }
+        public GitFile(String path) {
+            this.path = path;
+        }
 
-      @Override
-      public boolean equals(Object obj) {
-        if (this == obj) {
-          return true;
+        @Override
+        public int hashCode() {
+            int hash = 5;
+            hash = 73 * hash + Objects.hashCode(this.path);
+            return hash;
         }
-        if (obj == null) {
-          return false;
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final GitFile other = (GitFile) obj;
+            if (!Objects.equals(this.path, other.path)) {
+                return false;
+            }
+            return true;
         }
-        if (getClass() != obj.getClass()) {
-          return false;
+
+        @Override
+        public String toString() {
+            return (selected ? "* " : "") + (type != null ? "(" + type + ") " : "") + path;
         }
-        final GitFile other = (GitFile) obj;
-        if (!Objects.equals(this.path, other.path)) {
-          return false;
-        }
-        return true;
-      }
-      
-      @Override
-      public String toString(){
-        return (selected ? "* " : "") + (type != null ? "(" + type + ") " : "") + path;
-      }
     }
-    
-    static class GitBranch{
-      enum Type {
-        LOCAL, REMOTE
-      };
-      public final String name;
-      public GitBranch.Type type;
-      public boolean current;
 
-      public GitBranch(String name) {
-        this.name = name;
-      }
+    static class GitBranch {
+        enum Type {
+            LOCAL, REMOTE
+        }
 
-      @Override
-      public int hashCode() {
-        int hash = 7;
-        hash = 41 * hash + Objects.hashCode(this.name);
-        return hash;
-      }
+        ;
+        public final String name;
+        public GitBranch.Type type;
+        public boolean current;
 
-      @Override
-      public boolean equals(Object obj) {
-        if (this == obj) {
-          return true;
+        public GitBranch(String name) {
+            this.name = name;
         }
-        if (obj == null) {
-          return false;
+
+        @Override
+        public int hashCode() {
+            int hash = 7;
+            hash = 41 * hash + Objects.hashCode(this.name);
+            return hash;
         }
-        if (getClass() != obj.getClass()) {
-          return false;
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final GitBranch other = (GitBranch) obj;
+            if (!Objects.equals(this.name, other.name)) {
+                return false;
+            }
+            return true;
         }
-        final GitBranch other = (GitBranch) obj;
-        if (!Objects.equals(this.name, other.name)) {
-          return false;
+
+        @Override
+        public String toString() {
+            return (current ? "* " : "") + (type != null ? "(" + type + ") " : "") + name;
         }
-        return true;
-      }
-      
-      @Override
-      public String toString(){
-        return (current ? "* " : "") + (type != null ? "(" + type + ") " : "") + name;
-      }
     }
-    
+
     /**
      * UNIT TEST ONLY!
      */
-    public static void main(String[] args){
-      try{
-        System.out.println("isWindows()=" + isWindows());
-        System.out.println("isUnix()=" + isUnix());
-        System.out.println("getGitVersion()=" + getGitVersion());
-        System.out.println("listBranches()=" + listBranches());
-        checkoutBranch("test", false);
-        System.out.println("listChangedFiles()=" + listChangedFiles());
-        List<GitFile> files = new ArrayList<GitFile>();
-        files.add(new GitFile("test/long file name with spaces.txt"));
-        addFiles(files);
-        commit("test commit");
-        push("test");
-        System.out.println("listChangedFiles()=" + listChangedFiles());
-        System.out.println("*** Done ***");
-      }
-      catch(Exception ex){
-        ex.printStackTrace();
-      }
+    public static void main(String[] args) {
+        try {
+            System.out.println("isWindows()=" + isWindows());
+            System.out.println("isUnix()=" + isUnix());
+            System.out.println("getGitVersion()=" + getGitVersion());
+            System.out.println("listBranches()=" + listBranches());
+            checkoutBranch("test", false);
+            System.out.println("listChangedFiles()=" + listChangedFiles());
+            List<GitFile> files = new ArrayList<GitFile>();
+            files.add(new GitFile("test/long file name with spaces.txt"));
+            addFiles(files);
+            commit("test commit");
+            push("test");
+            System.out.println("listChangedFiles()=" + listChangedFiles());
+            System.out.println("*** Done ***");
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 }
 
