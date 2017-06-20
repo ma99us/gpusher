@@ -1,5 +1,6 @@
 package org.maggus.gpusher;
 
+import javax.imageio.IIOException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -7,7 +8,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import javax.imageio.IIOException;
 
 /**
  * Created by Mike on 2017-06-14.
@@ -23,7 +23,7 @@ public class GitRunner {
         return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
     }
 
-    public static String getWorkingDirectory(){
+    public static String getWorkingDirectory() {
         return Paths.get(".").toAbsolutePath().normalize().toString();
     }
 
@@ -86,15 +86,10 @@ public class GitRunner {
                 }
                 return false;
             }
+
             @Override
             public boolean parseErrorLine(String line) {
-                if (line.startsWith("Already on ")) {
-                    GitBranch b = new GitBranch(brName);
-                    b.current = true;
-                    list.add(b);
-                    return true;
-                }
-                return false;
+                return parseOutLine(line);
             }
         });
         if (list.isEmpty())
@@ -131,17 +126,17 @@ public class GitRunner {
                     GitFile.Type type = null;
                     String head = "new file:";
                     int p0 = line.indexOf(head);
-                    if(p0 >= 0){
+                    if (p0 >= 0) {
                         file = line.substring(p0 + head.length()).trim();
                         type = GitFile.Type.NEW;
                     }
                     head = "modified:";
                     p0 = line.indexOf(head);
-                    if(p0 >= 0){
+                    if (p0 >= 0) {
                         file = line.substring(p0 + head.length()).trim();
                         type = GitFile.Type.MODIFIED;
                     }
-                    if(file == null || type == null)
+                    if (file == null || type == null)
                         return false;       // Unsupported parsing!
                     GitFile f = new GitFile(file);
                     f.type = type;
@@ -226,6 +221,8 @@ public class GitRunner {
     }
 
     private static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
+        if (validator != null && !validator.preValidateCommand(command))
+            return;
         System.out.println("runCommand: " + command); // #debug
         BufferedReader input = null, err = null;
         try {
@@ -269,33 +266,44 @@ public class GitRunner {
                 sb.append("/");
             }
         }
-        if(comment != null){
+        if (comment != null) {
             comment = comment.trim().replaceAll("\\s+", "_");
             comment = comment.replaceAll("[.,;]", "");
-            if(comment.length() > 80){  // limit max length
+            if (comment.length() > 80) {  // limit max length
                 int p1 = comment.lastIndexOf("_");
-                if(p1 > 0)
+                if (p1 > 0)
                     comment = comment.substring(0, p1);
             }
             sb.append(comment);
         }
         String brName = sb.toString().trim();
         brName = brName.replaceAll("[^a-zA-Z0-9/_-]", "");
-        while(brName.startsWith("/")){
+        while (brName.startsWith("/")) {
             brName = brName.substring(1);
         }
-        while(brName.endsWith("/")){
-            brName = brName.substring(0, brName.length()-1);
+        while (brName.endsWith("/")) {
+            brName = brName.substring(0, brName.length() - 1);
         }
         return brName;
     }
 
+    private static CommandValidator validator;
+    public static void setCommandValidator(CommandValidator val){
+        validator = val;
+    }
+    public static abstract class CommandValidator {
+        boolean preValidateCommand(String command) {
+            return true;     // always valid
+        }
+    }
+
     public static abstract class CommandOutputParser {
-        boolean parseOutLine(String line){
+
+        boolean parseOutLine(String line) {
             return false;   // not handled
         }
 
-        boolean parseErrorLine(String line){
+        boolean parseErrorLine(String line) {
             return false;   // not handled
         }
     }
@@ -350,7 +358,6 @@ public class GitRunner {
             LOCAL, REMOTE
         }
 
-        ;
         public final String name;
         public GitBranch.Type type;
         public boolean current;
