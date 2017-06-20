@@ -1,10 +1,10 @@
 package org.maggus.gpusher;
 
 import javax.swing.*;
-import javax.swing.Timer;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
-import javax.swing.filechooser.FileSystemView;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -22,9 +22,15 @@ import org.maggus.gpusher.GitRunner.GitBranch;
 public class Main extends JFrame {
 
     class AppConfig extends Config {
+        // TODO: maybe do not store some settings globally
+        String curWorkingDir;
         GitBranch curBranch;
         List<GitFile> selectedFiles;
+        String lastCommitMessgae;
+        Boolean commitToNewBranch;
         String newBranchPrefix;
+        Boolean backToOriginalBranch;
+        Boolean pushAfterCommit;
 
         public AppConfig() {
             super("gpshr");
@@ -33,13 +39,44 @@ public class Main extends JFrame {
 
         @Override
         void onLoad(Properties props) {
+            lastCommitMessgae = props.getProperty("LAST_COMMIT_MESSAGE");
+            commitToNewBranch = parseBoolean(props.getProperty("COMMIT_TO_NEW_BRANCH"));
             newBranchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
+            backToOriginalBranch = parseBoolean(props.getProperty("BACK_TO_ORIGINAL_BRANCH"));
+            pushAfterCommit = parseBoolean(props.getProperty("PUSH_AFTER_COMMIT"));
         }
 
         @Override
         void onSave(Properties props) {
-            if(newBranchPrefix != null)
-                props.setProperty("NEW_BRANCH_PREFIX", newBranchPrefix);
+            saveValue(props, "LAST_COMMIT_MESSAGE", lastCommitMessgae);
+            saveValue(props, "COMMIT_TO_NEW_BRANCH", commitToNewBranch);
+            saveValue(props, "NEW_BRANCH_PREFIX", newBranchPrefix);
+            saveValue(props, "BACK_TO_ORIGINAL_BRANCH", backToOriginalBranch);
+            saveValue(props, "PUSH_AFTER_COMMIT", pushAfterCommit);
+        }
+    }
+
+    class FilesListSelectionModel extends DefaultListSelectionModel {
+        private static final long serialVersionUID = 1L;
+        boolean gestureStarted = false;
+
+        @Override
+        public void setSelectionInterval(int index0, int index1) {
+            if (!gestureStarted) {
+                if (isSelectedIndex(index0)) {
+                    super.removeSelectionInterval(index0, index1);
+                } else {
+                    super.addSelectionInterval(index0, index1);
+                }
+            }
+            gestureStarted = true;
+        }
+
+        @Override
+        public void setValueIsAdjusting(boolean isAdjusting) {
+            if (isAdjusting == false) {
+                gestureStarted = false;
+            }
         }
     }
 
@@ -70,71 +107,155 @@ public class Main extends JFrame {
     AppConfig config = new AppConfig();
     volatile boolean dataDone;
 
+    JButton refreshBtn;
     JList changesList;
     JLabel selectedLbl;
+    JTextField curWorkingDirTxt;
     JTextField curBranchTxt;
     JTextArea commitCommentTxt;
     JCheckBox newBranchCb;
     JTextField branchPrefixTxt;
     JTextField newBranchTxt;
+    JCheckBox backToOriginalBranchCb;
+    JCheckBox pushAfterCommitCb;
     JTextPane logTa;
+    JButton commitBtn;
 
     public Main() throws HeadlessException {
         super("G-Pusher");
 
-        changesList = new JList();
-        changesList.setModel(new DefaultListModel<String>());
-        changesList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        changesList.setSelectionModel(new DefaultListSelectionModel() {
-            private static final long serialVersionUID = 1L;
-            boolean gestureStarted = false;
-
-            @Override
-            public void setSelectionInterval(int index0, int index1) {
-                if (!gestureStarted) {
-                    if (isSelectedIndex(index0)) {
-                        super.removeSelectionInterval(index0, index1);
-                    } else {
-                        super.addSelectionInterval(index0, index1);
-                    }
-                }
-                gestureStarted = true;
-            }
-
-            @Override
-            public void setValueIsAdjusting(boolean isAdjusting) {
-                if (isAdjusting == false) {
-                    gestureStarted = false;
-                }
-            }
-
-        });
-        changesList.setCellRenderer(new CheckboxListCellRenderer());
-        changesList.addListSelectionListener(new ListSelectionListener() {
-            @Override
-            public void valueChanged(ListSelectionEvent e) {
-                persist();
-                updateGUI();
-            }
-        });
-
-        Container contentPane = getContentPane();
-        contentPane.setLayout(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(2, 2, 2, 2);
-        gbc.anchor = GridBagConstraints.CENTER;
-        gbc.gridwidth = 2;
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 0;
-        gbc.weighty = 0;
-        JButton refreshBtn = new JButton("Refresh");
+        // setup controls widgets
+        refreshBtn = new JButton("Refresh");
         refreshBtn.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 updateGitStatus();
             }
         });
+
+        curWorkingDirTxt = new JTextField();
+        //curBranchTxt.setEnabled(false);
+        curWorkingDirTxt.setEditable(false);
+
+        curBranchTxt = new JTextField();
+        //curBranchTxt.setEnabled(false);
+        curBranchTxt.setEditable(false);
+
+        changesList = new JList();
+        changesList.setModel(new DefaultListModel<GitFile>());
+        changesList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        changesList.setSelectionModel(new FilesListSelectionModel());
+        changesList.setCellRenderer(new CheckboxListCellRenderer());
+        changesList.addListSelectionListener(new ListSelectionListener() {
+            @Override
+            public void valueChanged(ListSelectionEvent e) {
+                //persist();
+                updateGUI();
+            }
+        });
+
+        selectedLbl = new JLabel("Selected files: <none>");
+
+        commitCommentTxt = new JTextArea(40, 3);
+        commitCommentTxt.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                config.lastCommitMessgae = commitCommentTxt.getText();
+                updateNewBrunchName();
+                updateGUI();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                config.lastCommitMessgae = commitCommentTxt.getText();
+                updateNewBrunchName();
+                updateGUI();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                config.lastCommitMessgae = commitCommentTxt.getText();
+                updateNewBrunchName();
+                updateGUI();
+            }
+        });
+
+        newBranchCb = new JCheckBox("Commit to a new brunch with prefix:");
+        newBranchCb.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                config.commitToNewBranch = newBranchCb.isSelected();
+                updateNewBrunchName();
+                updateGUI();
+            }
+        });
+
+        branchPrefixTxt = new JTextField(40);
+        branchPrefixTxt.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                config.newBranchPrefix = branchPrefixTxt.getText();
+                updateNewBrunchName();
+                updateGUI();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                config.newBranchPrefix = branchPrefixTxt.getText();
+                updateNewBrunchName();
+                updateGUI();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                config.newBranchPrefix = branchPrefixTxt.getText();
+                updateNewBrunchName();
+                updateGUI();
+            }
+        });
+
+        newBranchTxt = new JTextField(40);
+        //curBranchTxt.setEnabled(false);
+        //newBranchTxt.setEditable(false);
+
+        backToOriginalBranchCb = new JCheckBox("Checkout original branch again, once done.");
+        backToOriginalBranchCb.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                config.backToOriginalBranch = backToOriginalBranchCb.isSelected();
+                updateGUI();
+            }
+        });
+
+        pushAfterCommitCb = new JCheckBox("Also Push after Commit");
+        pushAfterCommitCb.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                config.pushAfterCommit = pushAfterCommitCb.isSelected();
+                updateGUI();
+            }
+        });
+
+        commitBtn = new JButton("Commit");
+        commitBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                commit();
+            }
+        });
+
+        // setup GUI layout
+        Container contentPane = getContentPane();
+        contentPane.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(2, 2, 2, 2);
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.gridwidth = 3;
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        //gbc.fill = GridBagConstraints.HORIZONTAL;
         contentPane.add(refreshBtn, gbc);
 
         gbc.anchor = GridBagConstraints.LINE_START;
@@ -143,22 +264,34 @@ public class Main extends JFrame {
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(new JLabel("Current branch: "), gbc);
+        contentPane.add(new JLabel("Working Directory: "), gbc);
+        gbc.gridwidth = 2;
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        curBranchTxt = new JTextField(40);
-        //curBranchTxt.setEnabled(false);
-        curBranchTxt.setEditable(false);
-        contentPane.add(curBranchTxt, gbc);
+        contentPane.add(curWorkingDirTxt, gbc);
 
-        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        gbc.gridwidth = 1;
         gbc.gridx = 0;
         gbc.gridy++;
+        gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(new JLabel("Select files to commit"), gbc);
-
+        contentPane.add(new JLabel("Current branch: "), gbc);
         gbc.gridwidth = 2;
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        contentPane.add(curBranchTxt, gbc);
+
+        gbc.gridwidth = 3;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(new JLabel("Select files to commit:"), gbc);
+
+        gbc.gridwidth = 3;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
@@ -166,14 +299,15 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.BOTH;
         contentPane.add(new JScrollPane(changesList), gbc);
 
+        gbc.gridwidth = 3;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        selectedLbl = new JLabel("Selected: <none>");
         contentPane.add(selectedLbl, gbc);
 
+        gbc.gridwidth = 3;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -181,27 +315,25 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("Commit comment:"), gbc);
 
+        gbc.gridwidth = 3;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
         gbc.weighty = 0.2;
         gbc.fill = GridBagConstraints.BOTH;
-        commitCommentTxt = new JTextArea(40, 3);
         contentPane.add(new JScrollPane(commitCommentTxt), gbc);
 
-        gbc.gridwidth = 1;
+        gbc.gridwidth = 2;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        newBranchCb = new JCheckBox("Commit to new brunch with prefix:");
-        newBranchCb.setBorder(BorderFactory.createEmptyBorder());
         contentPane.add(newBranchCb, gbc);
-        gbc.gridx = 1;
+        gbc.gridwidth = 1;
+        gbc.gridx = 2;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        branchPrefixTxt = new JTextField(40);
         contentPane.add(branchPrefixTxt, gbc);
 
         gbc.gridwidth = 1;
@@ -209,20 +341,44 @@ public class Main extends JFrame {
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(new JLabel("New branch: "), gbc);
+        contentPane.add(new JLabel("New branch name: "), gbc);
+        gbc.gridwidth = 2;
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        newBranchTxt = new JTextField(40);
-        //curBranchTxt.setEnabled(false);
-        newBranchTxt.setEditable(false);
         contentPane.add(newBranchTxt, gbc);
 
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 3;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(backToOriginalBranchCb, gbc);
+
+        gbc.gridwidth = 3;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(pushAfterCommitCb, gbc);
+
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.gridwidth = 3;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.weighty = 0;
+        //gbc.fill = GridBagConstraints.HORIZONTAL;
+        contentPane.add(commitBtn, gbc);
+
+        gbc.anchor = GridBagConstraints.LINE_START;
+        gbc.gridwidth = 3;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
-        gbc.weighty = 0.2;
+        gbc.weighty = 0.4;
         gbc.fill = GridBagConstraints.BOTH;
         logTa = new JTextPane();
         logTa.setEditable(false);
@@ -237,14 +393,43 @@ public class Main extends JFrame {
     }
 
     public void persist() {
-        //config.saveConfig();
+        config.saveConfig();
         // TODO: 2017-06-14 store current state to preferences file
     }
 
+    public void updateNewBrunchName() {
+        if(config.commitToNewBranch != null && config.commitToNewBranch){
+            String brName = GitRunner.buildBranchName(config.newBranchPrefix, config.lastCommitMessgae);
+            newBranchTxt.setText(brName);
+        }
+        else{
+            newBranchTxt.setText("");
+        }
+    }
+
     public void updateGUI() {
+        if(config.curWorkingDir != null){
+            curWorkingDirTxt.setText(config.curWorkingDir);
+        }
         if(config.curBranch != null){
             curBranchTxt.setText(config.curBranch.name);
         }
+        int[] selectedIndices = changesList.getSelectedIndices();
+        if (selectedIndices.length > 0)
+            selectedLbl.setText("Selected files: " + selectedIndices.length);
+        else
+            selectedLbl.setText("Selected files: <none>");
+        branchPrefixTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
+        newBranchTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
+        backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
+        commitBtn.setEnabled(selectedIndices.length > 0);
+        List<String> commitLbls = new ArrayList<String>();
+        if(config.commitToNewBranch != null && config.commitToNewBranch)
+            commitLbls.add("Branch");
+        commitLbls.add("Commit");
+        if(config.pushAfterCommit != null && config.pushAfterCommit)
+            commitLbls.add("Push");
+        commitBtn.setText(Config.listToString(commitLbls));
     }
 
     public void checkGit() {
@@ -261,6 +446,10 @@ public class Main extends JFrame {
         boolean updated = false;
         try {
             dataDone = false;
+
+            // working dir
+            config.curWorkingDir = GitRunner.getWorkingDirectory();
+
             // git branch
             List<GitBranch> branches = GitRunner.listBranches();
             for(GitBranch b : branches){
@@ -269,6 +458,7 @@ public class Main extends JFrame {
                     break;
                 }
             }
+
             // git status
             List<GitFile> files = GitRunner.listChangedFiles();
             //if(lastProcs == null || !lastProcs.equals(procs))
@@ -279,18 +469,18 @@ public class Main extends JFrame {
 //                        return o1.compareTo(o2);
 //                    }
 //                });
-                DefaultListModel filesModel = new DefaultListModel<String>();
+                DefaultListModel filesModel = new DefaultListModel<GitFile>();
                 for (GitFile file : files) {
                     filesModel.addElement(file);
                 }
                 changesList.setModel(filesModel);
                 // restore marked items
-//                for (int i = 0; i < procsModel.getSize(); i++) {
-//                    Proc o = (Proc) procsModel.get(i);
-//                    if (config.selectedProcs.contains(o)) {
-//                        changesList.addSelectionInterval(i, i);
-//                    }
-//                }
+                for (int i = 0; i < filesModel.getSize(); i++) {
+                    GitFile gf = (GitFile) filesModel.get(i);
+                    if (gf.selected) {
+                        changesList.addSelectionInterval(i, i);
+                    }
+                }
 //                lastProcs = procs;
                 updated = true;
             }
@@ -302,9 +492,76 @@ public class Main extends JFrame {
         finally {
             dataDone = true;
             if (updated) {
-                persist();
+                //persist();
                 updateGUI();
             }
+        }
+    }
+
+    public void commit(){
+        try{
+            long t0 = System.currentTimeMillis();
+
+            persist();
+
+            GitBranch workBranch = config.curBranch;
+            // checkout new branch if needed
+            if(config.commitToNewBranch != null && config.commitToNewBranch){
+                String newBrName = newBranchTxt.getText().trim();
+                workBranch = GitRunner.checkoutBranch(newBrName, true);
+            }
+
+            List<GitFile> gitFiles = GitRunner.listChangedFiles();  // all git changed files
+            // add selected files to commit
+            List<GitFile> selList = (List<GitFile>)changesList.getSelectedValuesList(); // selected only files
+            for(GitFile f : selList){
+                int p0 = gitFiles.indexOf(f);
+                if(p0 < 0)
+                    continue;   // TODO: 2017-06-20 should not happen, or Refesh needed
+                GitFile gf = gitFiles.get(p0);
+                if(!gf.selected)
+                    GitRunner.addFile(gf.path);
+            }
+
+            // remove unselected files from commit
+            for(GitFile gf : gitFiles){
+                if(!gf.selected)
+                    continue;
+                if(!selList.contains(gf))
+                    GitRunner.unAddFile(gf.path);
+            }
+
+            // commit
+            GitRunner.commit(config.lastCommitMessgae);
+
+            // push to remote repo if needed
+            if(config.pushAfterCommit != null && config.pushAfterCommit){
+                GitRunner.push(workBranch.name);
+            }
+
+            // checkout original branch if needed
+            if(config.commitToNewBranch != null && config.commitToNewBranch && config.backToOriginalBranch != null && config.backToOriginalBranch){
+                GitRunner.checkoutBranch(config.curBranch.name, false);
+            }
+
+            // done
+            long t1 = System.currentTimeMillis();
+            int ts = (int)((t1-t0)/1000);
+            String tsStr;
+            if(ts == 0)
+                tsStr = "in less then a second.";
+            else if(ts == 1)
+                tsStr = "in one second.";
+            else
+                tsStr = "in " + ts + " seconds.";
+            log("info", "Done " + tsStr);
+        }
+        catch(Exception ex){
+            ex.printStackTrace();
+            log("err", ex.getMessage());
+        }
+        finally {
+            updateGitStatus();
         }
     }
 
@@ -350,7 +607,7 @@ public class Main extends JFrame {
             gui.updateGitStatus();
 
             // show GUI
-            gui.setPreferredSize(new Dimension(600, 500));
+            gui.setPreferredSize(new Dimension(600, 600));
             gui.pack();
             gui.setLocationRelativeTo(null);
             gui.setVisible(true);
