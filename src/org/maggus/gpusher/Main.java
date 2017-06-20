@@ -13,6 +13,8 @@ import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -148,6 +150,15 @@ public class Main extends JFrame {
         curWorkingDirTxt = new JTextField();
         //curBranchTxt.setEnabled(false);
         curWorkingDirTxt.setEditable(false);
+        curWorkingDirTxt.addMouseListener(new MouseAdapter() {      // easter egg / about box
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                super.mouseClicked(e);
+                if(e.getClickCount() == 3){
+                    showAboutDialog();
+                }
+            }
+        });
 
         curBranchTxt = new JTextField();
         //curBranchTxt.setEnabled(false);
@@ -402,6 +413,11 @@ public class Main extends JFrame {
         contentPane.add(scrollPane, gbc);
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    }
+
+    private void showAboutDialog(){
+        JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
+        JOptionPane.showMessageDialog(null, picLabel, "G-Pusher by Mike Gerdov v.2017.06.20", JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
