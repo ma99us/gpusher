@@ -1,5 +1,9 @@
 package org.maggus.gpusher;
 
+import org.maggus.gpusher.GitRunner.GitBranch;
+import org.maggus.gpusher.GitRunner.GitFile;
+import org.maggus.gpusher.Log.LogListener;
+
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -9,12 +13,9 @@ import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.*;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
 import java.util.List;
-import org.maggus.gpusher.GitRunner.GitFile;
-import org.maggus.gpusher.GitRunner.GitBranch;
+import java.util.Properties;
 
 /**
  * Created by Mike on 2017-06-14.
@@ -26,9 +27,9 @@ public class Main extends JFrame {
         String curWorkingDir;
         GitBranch curBranch;
         List<GitFile> selectedFiles;
-        String lastCommitMessgae;
+        String commitMessgae;
         Boolean commitToNewBranch;
-        String newBranchPrefix;
+        String branchPrefix;
         Boolean backToOriginalBranch;
         Boolean pushAfterCommit;
 
@@ -39,18 +40,32 @@ public class Main extends JFrame {
 
         @Override
         void onLoad(Properties props) {
-            lastCommitMessgae = props.getProperty("LAST_COMMIT_MESSAGE");
+            commitMessgae = props.getProperty("LAST_COMMIT_MESSAGE");
             commitToNewBranch = parseBoolean(props.getProperty("COMMIT_TO_NEW_BRANCH"));
-            newBranchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
+            branchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
             backToOriginalBranch = parseBoolean(props.getProperty("BACK_TO_ORIGINAL_BRANCH"));
             pushAfterCommit = parseBoolean(props.getProperty("PUSH_AFTER_COMMIT"));
+
+            // init controls
+            if(commitMessgae != null)
+                commitMessageTxt.setText(commitMessgae);
+            if(commitToNewBranch != null)
+                commitToNewBranchCb.setSelected(commitToNewBranch);
+            if(branchPrefix != null)
+                branchPrefixTxt.setText(branchPrefix);
+            if(backToOriginalBranch != null)
+                backToOriginalBranchCb.setSelected(backToOriginalBranch);
+            if(pushAfterCommit != null)
+                pushAfterCommitCb.setSelected(pushAfterCommit);
+            updateNewBrunchName();
+            updateGUI();
         }
 
         @Override
         void onSave(Properties props) {
-            saveValue(props, "LAST_COMMIT_MESSAGE", lastCommitMessgae);
+            saveValue(props, "LAST_COMMIT_MESSAGE", commitMessgae);
             saveValue(props, "COMMIT_TO_NEW_BRANCH", commitToNewBranch);
-            saveValue(props, "NEW_BRANCH_PREFIX", newBranchPrefix);
+            saveValue(props, "NEW_BRANCH_PREFIX", branchPrefix);
             saveValue(props, "BACK_TO_ORIGINAL_BRANCH", backToOriginalBranch);
             saveValue(props, "PUSH_AFTER_COMMIT", pushAfterCommit);
         }
@@ -101,9 +116,6 @@ public class Main extends JFrame {
         }
     }
 
-    static PrintStream out = System.out;        // #debug
-    static SimpleDateFormat sdf = new SimpleDateFormat("yyyy.MM.dd HH.mm.ss");
-
     AppConfig config = new AppConfig();
     volatile boolean dataDone;
 
@@ -112,8 +124,8 @@ public class Main extends JFrame {
     JLabel selectedLbl;
     JTextField curWorkingDirTxt;
     JTextField curBranchTxt;
-    JTextArea commitCommentTxt;
-    JCheckBox newBranchCb;
+    JTextArea commitMessageTxt;
+    JCheckBox commitToNewBranchCb;
     JTextField branchPrefixTxt;
     JTextField newBranchTxt;
     JCheckBox backToOriginalBranchCb;
@@ -156,35 +168,35 @@ public class Main extends JFrame {
 
         selectedLbl = new JLabel("Selected files: <none>");
 
-        commitCommentTxt = new JTextArea(40, 3);
-        commitCommentTxt.getDocument().addDocumentListener(new DocumentListener() {
+        commitMessageTxt = new JTextArea(40, 3);
+        commitMessageTxt.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                config.lastCommitMessgae = commitCommentTxt.getText();
+                config.commitMessgae = commitMessageTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                config.lastCommitMessgae = commitCommentTxt.getText();
+                config.commitMessgae = commitMessageTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                config.lastCommitMessgae = commitCommentTxt.getText();
+                config.commitMessgae = commitMessageTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
         });
 
-        newBranchCb = new JCheckBox("Commit to a new brunch with prefix:");
-        newBranchCb.addActionListener(new ActionListener() {
+        commitToNewBranchCb = new JCheckBox("Commit to a new brunch with prefix:");
+        commitToNewBranchCb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                config.commitToNewBranch = newBranchCb.isSelected();
+                config.commitToNewBranch = commitToNewBranchCb.isSelected();
                 updateNewBrunchName();
                 updateGUI();
             }
@@ -194,21 +206,21 @@ public class Main extends JFrame {
         branchPrefixTxt.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                config.newBranchPrefix = branchPrefixTxt.getText();
+                config.branchPrefix = branchPrefixTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                config.newBranchPrefix = branchPrefixTxt.getText();
+                config.branchPrefix = branchPrefixTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                config.newBranchPrefix = branchPrefixTxt.getText();
+                config.branchPrefix = branchPrefixTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
@@ -321,7 +333,7 @@ public class Main extends JFrame {
         gbc.weightx = 1.0;
         gbc.weighty = 0.2;
         gbc.fill = GridBagConstraints.BOTH;
-        contentPane.add(new JScrollPane(commitCommentTxt), gbc);
+        contentPane.add(new JScrollPane(commitMessageTxt), gbc);
 
         gbc.gridwidth = 2;
         gbc.gridx = 0;
@@ -329,7 +341,7 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(newBranchCb, gbc);
+        contentPane.add(commitToNewBranchCb, gbc);
         gbc.gridwidth = 1;
         gbc.gridx = 2;
         gbc.weightx = 1.0;
@@ -399,7 +411,7 @@ public class Main extends JFrame {
 
     public void updateNewBrunchName() {
         if(config.commitToNewBranch != null && config.commitToNewBranch){
-            String brName = GitRunner.buildBranchName(config.newBranchPrefix, config.lastCommitMessgae);
+            String brName = GitRunner.buildBranchName(config.branchPrefix, config.commitMessgae);
             newBranchTxt.setText(brName);
         }
         else{
@@ -436,9 +448,9 @@ public class Main extends JFrame {
         try {
             dataDone = false;
             String ver = GitRunner.getGitVersion();
-            log(ver);
+            Log.log(ver);
         } catch (Exception ex) {
-            log("err", ex.getMessage());
+            Log.log(Log.Level.err, ex.getMessage());
         }
     }
 
@@ -487,7 +499,7 @@ public class Main extends JFrame {
         }
         catch(Exception ex){
             ex.printStackTrace();
-            log("err", ex.getMessage());
+            Log.log(Log.Level.err, ex.getMessage());
         }
         finally {
             dataDone = true;
@@ -503,6 +515,14 @@ public class Main extends JFrame {
             long t0 = System.currentTimeMillis();
 
             persist();
+
+            GitRunner.setCommandValidator(new GitRunner.CommandValidator() {
+                @Override
+                boolean preValidateCommand(String command) {
+                    Log.log("#> " + command);
+                    return true;
+                }
+            });
 
             GitBranch workBranch = config.curBranch;
             // checkout new branch if needed
@@ -532,7 +552,7 @@ public class Main extends JFrame {
             }
 
             // commit
-            GitRunner.commit(config.lastCommitMessgae);
+            GitRunner.commit(config.commitMessgae);
 
             // push to remote repo if needed
             if(config.pushAfterCommit != null && config.pushAfterCommit){
@@ -554,32 +574,28 @@ public class Main extends JFrame {
                 tsStr = "in one second.";
             else
                 tsStr = "in " + ts + " seconds.";
-            log("info", "Done " + tsStr);
+            Log.log("Done " + tsStr);
         }
         catch(Exception ex){
             ex.printStackTrace();
-            log("err", ex.getMessage());
+            Log.log(Log.Level.err, ex.getMessage());
         }
         finally {
+            GitRunner.setCommandValidator(null);
             updateGitStatus();
         }
     }
 
-    void log(String text) {
-        log("info", text);
-    }
-
-    void log(String type, String text) {
+    void onLog(Log.Level level, String text) {
         try {
             SimpleAttributeSet atr = new SimpleAttributeSet();
-            if ("warn".equals(type)) {
+            if (level == Log.Level.warn) {
                 StyleConstants.setForeground(atr, Color.ORANGE);
-            } else if ("err".equals(type)) {
+            } else if (level == Log.Level.err) {
                 StyleConstants.setForeground(atr, Color.RED);
             }
-            //String line = sdf.format(Calendar.getInstance().getTime()) + ": " + text;
+            //String line = Log.getTimestamp() + ": " + text;
             String line = text;
-            out.println(line);
             Document doc = logTa.getStyledDocument();
             if (doc.getLength() != 0)
                 doc.insertString(doc.getLength(), "\n", null);
@@ -601,7 +617,13 @@ public class Main extends JFrame {
             }
 
             final Main gui = new Main();      // create GUI
-            gui.log(os);
+            Log.setLogListener(new LogListener(){
+                @Override
+                public void onLog(Log.Level lvl, String message) {
+                    gui.onLog(lvl, message);
+                }
+            });
+            Log.log(os);
             gui.config.loadConfig();    // load stored preferences
             gui.checkGit();
             gui.updateGitStatus();
