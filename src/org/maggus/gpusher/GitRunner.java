@@ -3,6 +3,7 @@ package org.maggus.gpusher;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,6 +23,10 @@ public class GitRunner {
         return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
     }
 
+    public static String getWorkingDirectory(){
+        return Paths.get(".").toAbsolutePath().normalize().toString();
+    }
+
     static String getGitVersion() throws IOException {
         StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
@@ -34,7 +39,7 @@ public class GitRunner {
         return sb.toString().trim();
     }
 
-    static public List<GitBranch> listBranches() throws IOException {
+    public static List<GitBranch> listBranches() throws IOException {
         BufferedReader input = null, err = null;
         List<GitBranch> list = new ArrayList<GitBranch>();
         runCommand("git branch", new CommandOutputParser() {
@@ -56,7 +61,7 @@ public class GitRunner {
         return list;
     }
 
-    static public GitBranch checkoutBranch(String brName, boolean isNew) throws IOException {
+    public static GitBranch checkoutBranch(String brName, boolean isNew) throws IOException {
         BufferedReader input = null, err = null;
         List<GitBranch> list = new ArrayList<GitBranch>();
         String command = "git checkout " + (isNew ? "-b " : "") + "\"" + brName + "\"";
@@ -97,7 +102,7 @@ public class GitRunner {
         return list.get(0);
     }
 
-    static List<GitFile> listChangedFiles() throws IOException {
+    public static List<GitFile> listChangedFiles() throws IOException {
         BufferedReader input = null, err = null;
         List<GitFile> files = new ArrayList<GitFile>();
         runCommand("git status", new CommandOutputParser() {
@@ -122,11 +127,25 @@ public class GitRunner {
 
                 if (ready && section == 1 && !line.trim().isEmpty()) {
                     // new/added files
+                    String file = null;
+                    GitFile.Type type = null;
                     String head = "new file:";
                     int p0 = line.indexOf(head);
-                    String file = line.substring(p0 + head.length()).trim();
+                    if(p0 >= 0){
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.NEW;
+                    }
+                    head = "modified:";
+                    p0 = line.indexOf(head);
+                    if(p0 >= 0){
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.MODIFIED;
+                    }
+                    if(file == null || type == null)
+                        return false;       // Unsupported parsing!
                     GitFile f = new GitFile(file);
-                    f.type = GitFile.Type.NEW;
+                    f.type = type;
+                    f.selected = true;
                     files.add(f);
                     return true;
                 } else if (ready && section == 2 && !line.trim().isEmpty()) {
@@ -169,17 +188,31 @@ public class GitRunner {
         return files;
     }
 
-    static void addFiles(List<GitFile> files) throws IOException {
+    public static void addFile(String path) throws IOException {
+        runCommand("git add \"" + path + "\"", null);
+    }
+
+    public static void addFiles(List<GitFile> files) throws IOException {
         for (GitFile file : files) {
-            runCommand("git add \"" + file.path + "\"", null);
+            addFile(file.path);
         }
     }
 
-    static void commit(String comment) throws IOException {
+    public static void unAddFile(String path) throws IOException {
+        runCommand("git reset \"" + path + "\"", null);
+    }
+
+    public static void unAddFiles(List<GitFile> files) throws IOException {
+        for (GitFile file : files) {
+            unAddFile(file.path);
+        }
+    }
+
+    public static void commit(String comment) throws IOException {
         runCommand("git commit -m \"" + comment + "\"", null);
     }
 
-    static void push(String brName) throws IOException {
+    public static void push(String brName) throws IOException {
         runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
@@ -192,7 +225,7 @@ public class GitRunner {
         });
     }
 
-    static public void runCommand(String command, CommandOutputParser outClbk) throws IOException {
+    private static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
         System.out.println("runCommand: " + command); // #debug
         BufferedReader input = null, err = null;
         try {
@@ -212,6 +245,7 @@ public class GitRunner {
             while ((line = err.readLine()) != null) {
                 //System.err.println(line); // #debug
                 if (outClbk == null || !outClbk.parseErrorLine(line)) {
+                    System.out.println("! " + line); // #debug
                     sb.append(line + "\n");
                 }
             }
@@ -235,10 +269,25 @@ public class GitRunner {
                 sb.append("/");
             }
         }
-        comment = comment.trim().replaceAll("\\s+", "_");
-        comment = comment.replaceAll("[.,;]", "");
-        sb.append(comment);
-        return sb.toString().trim();
+        if(comment != null){
+            comment = comment.trim().replaceAll("\\s+", "_");
+            comment = comment.replaceAll("[.,;]", "");
+            if(comment.length() > 80){  // limit max length
+                int p1 = comment.lastIndexOf("_");
+                if(p1 > 0)
+                    comment = comment.substring(0, p1);
+            }
+            sb.append(comment);
+        }
+        String brName = sb.toString().trim();
+        brName = brName.replaceAll("[^a-zA-Z0-9/_-]", "");
+        while(brName.startsWith("/")){
+            brName = brName.substring(1);
+        }
+        while(brName.endsWith("/")){
+            brName = brName.substring(0, brName.length()-1);
+        }
+        return brName;
     }
 
     public static abstract class CommandOutputParser {
@@ -348,6 +397,7 @@ public class GitRunner {
         try {
             System.out.println("isWindows()=" + isWindows());
             System.out.println("isUnix()=" + isUnix());
+            System.out.println("getWorkingDirectory()=" + getWorkingDirectory());
             System.out.println("getGitVersion()=" + getGitVersion());
             System.out.println("listBranches()=" + listBranches());
             checkoutBranch("test", false);

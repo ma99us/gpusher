@@ -70,6 +70,48 @@ public abstract class Config {
 
     abstract void onSave(Properties props);
 
+    public static Boolean parseBoolean(String val){
+        try {
+            return Boolean.parseBoolean(val);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public static Integer parseInteger(String val){
+        try {
+            return Integer.parseInt(val);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public static Long parseLong(String val){
+        try {
+            return Long.parseLong(val);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    public static void saveValue(Properties props, String tag, Object val){
+        if(val == null)
+            return;
+        else if(val instanceof Boolean)
+            props.setProperty(tag, Boolean.toString((Boolean)val));
+        else if(val instanceof Long)
+            props.setProperty(tag, Long.toString((Long)val));
+        else if(val instanceof Integer)
+            props.setProperty(tag, Integer.toString((Integer)val));
+        else
+            props.setProperty(tag, val.toString());
+    }
+
+    public static Object loadValue(Properties props, String tag) {
+        // TODO: 2017-06-20 figure out a way to store and load values with their type
+        return null;
+    }
+
     public static void saveList(Properties props, String tag, List col, ItemSerializer ser){
         tag = tag.toUpperCase().trim();
         int size = col.size();
@@ -100,5 +142,19 @@ public abstract class Config {
     public static interface ItemSerializer<T>{
         String writeToString(T val);
         T readFromString(String str);
+    }
+
+    public static String listToString(List values){
+        if(values == null || values.isEmpty())
+            return "";
+        StringBuilder sb = new StringBuilder();
+        for(Object val : values){
+            if(val == null)
+                continue;
+            if(sb.length() > 0)
+                sb.append(", ");
+            sb.append(val.toString());
+        }
+        return sb.toString().trim();
     }
 }
