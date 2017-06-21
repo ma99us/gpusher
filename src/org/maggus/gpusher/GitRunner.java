@@ -23,10 +23,6 @@ public class GitRunner {
         return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
     }
 
-    public static String getWorkingDirectory() {
-        return Paths.get(".").toAbsolutePath().normalize().toString();
-    }
-
     static String getGitVersion() throws IOException {
         StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
@@ -404,7 +400,7 @@ public class GitRunner {
         try {
             System.out.println("isWindows()=" + isWindows());
             System.out.println("isUnix()=" + isUnix());
-            System.out.println("getWorkingDirectory()=" + getWorkingDirectory());
+            //System.out.println("getWorkingDirectory()=" + getWorkingDirectory());
             System.out.println("getGitVersion()=" + getGitVersion());
             System.out.println("listBranches()=" + listBranches());
             checkoutBranch("test", false);

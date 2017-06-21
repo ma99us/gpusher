@@ -3,6 +3,7 @@ package org.maggus.gpusher;
 import javax.swing.*;
 import javax.swing.filechooser.FileSystemView;
 import java.io.*;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -14,22 +15,32 @@ import java.util.Properties;
 public abstract class Config {
     public final String APP_DIR;
     public final String CONFIG_FILE_NAME;
+    public final boolean global;
     public String configComment;
 
-    public Config(String appTag){
+    public Config(String appTag, boolean global){
         String tag = appTag.toLowerCase().trim();
-        APP_DIR = "."+tag;
+        APP_DIR = "." + tag;
         CONFIG_FILE_NAME = tag + ".properties";
+        this.global = global;
     }
 
-    private File getUserDir() {
+    public File getUserDir() {
         JFileChooser fr = new JFileChooser();
         FileSystemView fw = fr.getFileSystemView();
         return fw.getDefaultDirectory();
     }
 
+    public File getWorkingDir() {
+        return new File(Paths.get(".").toAbsolutePath().normalize().toString());
+    }
+
     public void loadConfig() {
-        File prefDir = new File(getUserDir(), APP_DIR);
+        File prefDir;
+        if(global)
+            prefDir = new File(getUserDir(), APP_DIR);
+        else
+            prefDir = getWorkingDir();
         if (!prefDir.exists() || !prefDir.isDirectory())
             prefDir.mkdirs();
         File propFile = new File(prefDir, CONFIG_FILE_NAME);
@@ -51,7 +62,11 @@ public abstract class Config {
     }
 
     public void saveConfig() {
-        File prefDir = new File(getUserDir(), APP_DIR);
+        File prefDir;
+        if(global)
+            prefDir = new File(getUserDir(), APP_DIR);
+        else
+            prefDir = getWorkingDir();
         if (!prefDir.exists() || !prefDir.isDirectory())
             prefDir.mkdirs();
         File propFile = new File(prefDir, CONFIG_FILE_NAME);

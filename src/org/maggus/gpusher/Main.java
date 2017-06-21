@@ -36,7 +36,7 @@ public class Main extends JFrame {
         Boolean pushAfterCommit;
 
         public AppConfig() {
-            super("gpshr");
+            super("gpshr", false);  // store setting in workign dir
             configComment = "This is a G-Pusher configuration file";
         }
 
@@ -476,7 +476,7 @@ public class Main extends JFrame {
             dataDone = false;
 
             // working dir
-            config.curWorkingDir = GitRunner.getWorkingDirectory();
+            config.curWorkingDir = config.getWorkingDir().getCanonicalPath();
 
             // git branch
             List<GitBranch> branches = GitRunner.listBranches();
