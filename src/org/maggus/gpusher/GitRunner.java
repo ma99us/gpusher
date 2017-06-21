@@ -226,6 +226,9 @@ public class GitRunner {
                 if(errors.contains(brName + " -> " + brName)){
                     return true;        // it is successful
                 }
+                else if(errors.contains("Everything up-to-date")){
+                    return true;        // it is successful
+                }
                 return false;
             }
         });
