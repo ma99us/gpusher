@@ -93,6 +93,10 @@ public class GitRunner {
         return list.get(0);
     }
 
+    public static void pull() throws IOException {
+        runCommand("git pull", null);
+    }
+        
     public static List<GitFile> listChangedFiles() throws IOException {
         BufferedReader input = null, err = null;
         List<GitFile> files = new ArrayList<GitFile>();

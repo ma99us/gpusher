@@ -73,6 +73,15 @@ public class Main extends JFrame {
         }
     }
 
+    class CommandsLogger extends GitRunner.CommandValidator {
+
+        @Override
+        boolean preValidateCommand(String command) {
+            Log.log("#> " + command);
+            return true;
+        }
+    }
+    
     class FilesListSelectionModel extends DefaultListSelectionModel {
         private static final long serialVersionUID = 1L;
         boolean gestureStarted = false;
@@ -122,6 +131,8 @@ public class Main extends JFrame {
     volatile boolean dataDone;
 
     JButton refreshBtn;
+    JButton checkoutBranchBtn;
+    JButton pullBtn;
     JList changesList;
     JLabel selectedLbl;
     JTextField curWorkingDirTxt;
@@ -164,6 +175,22 @@ public class Main extends JFrame {
         //curBranchTxt.setEnabled(false);
         curBranchTxt.setEditable(false);
 
+        checkoutBranchBtn = new JButton("Checkout");
+        checkoutBranchBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showCheckoutDialog();
+            }
+        });
+
+        pullBtn = new JButton("Pull");
+        pullBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                pull();
+            }
+        });
+        
         changesList = new JList();
         changesList.setModel(new DefaultListModel<GitFile>());
         changesList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -273,7 +300,7 @@ public class Main extends JFrame {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(2, 2, 2, 2);
         gbc.anchor = GridBagConstraints.CENTER;
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy = 0;
         gbc.weightx = 0;
@@ -288,7 +315,7 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("Working Directory: "), gbc);
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 4;
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -306,15 +333,25 @@ public class Main extends JFrame {
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         contentPane.add(curBranchTxt, gbc);
+        gbc.gridwidth = 1;
+        gbc.gridx = 3;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(pullBtn, gbc);
+        gbc.gridwidth = 1;
+        gbc.gridx = 4;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(checkoutBranchBtn, gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("Select files to commit:"), gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
@@ -322,7 +359,7 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.BOTH;
         contentPane.add(new JScrollPane(changesList), gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -330,7 +367,7 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(selectedLbl, gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -338,7 +375,7 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("Commit comment:"), gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
@@ -353,7 +390,7 @@ public class Main extends JFrame {
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(commitToNewBranchCb, gbc);
-        gbc.gridwidth = 1;
+        gbc.gridwidth = 3;
         gbc.gridx = 2;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -365,13 +402,13 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("New branch name: "), gbc);
-        gbc.gridwidth = 2;
+        gbc.gridwidth = 4;
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         contentPane.add(newBranchTxt, gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -379,7 +416,7 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(pushAfterCommitCb, gbc);
 
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -388,7 +425,7 @@ public class Main extends JFrame {
         contentPane.add(backToOriginalBranchCb, gbc);
 
         gbc.anchor = GridBagConstraints.CENTER;
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -397,7 +434,7 @@ public class Main extends JFrame {
         contentPane.add(commitBtn, gbc);
 
         gbc.anchor = GridBagConstraints.LINE_START;
-        gbc.gridwidth = 3;
+        gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 1.0;
@@ -417,7 +454,7 @@ public class Main extends JFrame {
 
     private void showAboutDialog(){
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(null, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.21", JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.21", JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -525,20 +562,104 @@ public class Main extends JFrame {
             }
         }
     }
+    
+    public void showCheckoutDialog() {
+        try {
+            DefaultListModel branchesModel = new DefaultListModel<GitBranch>();
+            List<GitBranch> branches = GitRunner.listBranches();
+            for(GitBranch b : branches){
+                branchesModel.addElement(b);
+            }
+            JList branchesList = new JList(branchesModel);
+            // mark current item
+            for (int i = 0; i < branchesModel.getSize(); i++) {
+                GitBranch gf = (GitBranch) branchesModel.get(i);
+                if (gf.current) {
+                    branchesList.addSelectionInterval(i, i);
+                }
+            }         
+            
+            // setup dialog
+            JButton okButton = new JButton("Checkout");
+            JButton cancelButton = new JButton("Cancel");
+            JOptionPane optionPane = new JOptionPane(branchesList);
+            optionPane.setOptions(new Object[]{okButton, cancelButton});
+            final JDialog dialog = optionPane.createDialog("Select branch to checkout");
+            okButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    GitBranch branch = (GitBranch) branchesList.getSelectedValue();
+                    dialog.setVisible(false);
+                    checkoutBranch(branch.name);
+                }
+            });
+            cancelButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    dialog.setVisible(false);
+                }
+            });
+            dialog.setVisible(true);        // show dialog
+        }
+        catch(Exception ex){
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
+        }
+    }
 
+    public void checkoutBranch(String brName) {
+        try {
+            GitRunner.setCommandValidator(new CommandsLogger());
+            
+            GitRunner.checkoutBranch(brName, false);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
+        } finally {
+            GitRunner.setCommandValidator(null);
+            updateGitStatus();
+        }
+    }
+    
+    public void pull(){
+        try{
+            long t0 = System.currentTimeMillis();
+
+            persist();
+
+            GitRunner.setCommandValidator(new CommandsLogger());
+
+            GitRunner.pull();
+
+            // done
+            long t1 = System.currentTimeMillis();
+            int ts = (int)((t1-t0)/1000);
+            String tsStr;
+            if(ts == 0)
+                tsStr = "in less then a second.";
+            else if(ts == 1)
+                tsStr = "in one second.";
+            else
+                tsStr = "in " + ts + " seconds.";
+            Log.log("Done " + tsStr);
+        }
+        catch(Exception ex){
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
+        }
+        finally {
+            GitRunner.setCommandValidator(null);
+            updateGitStatus();
+        }        
+    }
+    
     public void commit(){
         try{
             long t0 = System.currentTimeMillis();
 
             persist();
 
-            GitRunner.setCommandValidator(new GitRunner.CommandValidator() {
-                @Override
-                boolean preValidateCommand(String command) {
-                    Log.log("#> " + command);
-                    return true;
-                }
-            });
+            GitRunner.setCommandValidator(new CommandsLogger());
 
             GitBranch workBranch = config.curBranch;
             // checkout new branch if needed
