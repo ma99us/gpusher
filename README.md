@@ -1,5 +1,7 @@
 # gpusher
 
+GIT version control system is great, but:
+
   * Does your IDE GIT plugin constantly screwing up your files?
   * Do you only trust command line GIT tool, but tired of typing same commands over and over again?
   * Do you often want to push a few changed files into separate branch (for later merge request), and continue working on your main development branch?
