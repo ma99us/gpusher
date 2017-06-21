@@ -477,7 +477,10 @@ public class Main extends JFrame {
             curWorkingDirTxt.setText(config.curWorkingDir);
         }
         if(config.curBranch != null){
-            curBranchTxt.setText(config.curBranch.name);
+            String curBrName = config.curBranch.name;
+            if(config.curBranch.type != null)
+                curBrName += "\t(" + config.curBranch.type + ")";
+            curBranchTxt.setText(curBrName);
         }
         int[] selectedIndices = changesList.getSelectedIndices();
         if (selectedIndices.length > 0)
@@ -487,14 +490,19 @@ public class Main extends JFrame {
         branchPrefixTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         newBranchTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
-        commitBtn.setEnabled(selectedIndices.length > 0);
+        commitBtn.setEnabled(selectedIndices.length > 0 || (config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));
         List<String> commitLbls = new ArrayList<String>();
         if(config.commitToNewBranch != null && config.commitToNewBranch)
             commitLbls.add("Branch");
-        commitLbls.add("Commit");
-        if(config.pushAfterCommit != null && config.pushAfterCommit)
+        if(selectedIndices.length > 0)
+            commitLbls.add("Commit");
+        if((config.pushAfterCommit != null && config.pushAfterCommit) 
+                || (selectedIndices.length == 0 && config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD))
             commitLbls.add("Push");
-        commitBtn.setText(Config.listToString(commitLbls));
+        String caption = Config.listToString(commitLbls);
+        if(caption.isEmpty())
+            caption = "nothing to do";
+        commitBtn.setText(caption);
     }
 
     public void checkGit() {
@@ -524,6 +532,11 @@ public class Main extends JFrame {
                 }
             }
 
+            // checkout current branch again, to get it's status
+            if(config.curBranch != null){
+                config.curBranch = GitRunner.checkoutBranch(config.curBranch.name, false);
+            }
+            
             // git status
             List<GitFile> files = GitRunner.listChangedFiles();
             //if(lastProcs == null || !lastProcs.equals(procs))

@@ -59,29 +59,26 @@ public class GitRunner {
 
     public static GitBranch checkoutBranch(String brName, boolean isNew) throws IOException {
         BufferedReader input = null, err = null;
-        List<GitBranch> list = new ArrayList<GitBranch>();
+        //List<GitBranch> list = new ArrayList<GitBranch>();
+        GitBranch branch = new GitBranch(brName);
         String command = "git checkout " + (isNew ? "-b " : "") + "\"" + brName + "\"";
         runCommand(command, new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
                 if (line.startsWith("Already on ")) {
-                    GitBranch b = new GitBranch(brName);
-                    b.current = true;
-                    list.add(b);
+                    branch.current = true;
                     return true;
                 } else if (line.startsWith("Switched to branch ")) {
-                    GitBranch b = new GitBranch(brName);
-                    b.current = true;
-                    list.add(b);
+                    branch.current = true;
                     return true;
                 } else if (line.startsWith("Switched to a new branch ")) {
-                    GitBranch b = new GitBranch(brName);
-                    b.current = true;
-                    //list.get(0).type = GitBranch.Type.LOCAL;
-                    list.add(b);
+                    branch.current = true;
+                    //b.type = GitBranch.Type.LOCAL;
                     return true;
-                } else if(line.startsWith("Your branch is up-to-date") && !list.isEmpty()){
-                    list.get(0).type = GitBranch.Type.UPTODATE;
+                } else if(line.startsWith("Your branch is up-to-date")){
+                    branch.type = GitBranch.Type.UPTODATE;
+                } else if(line.startsWith("Your branch is ahead of ")){
+                    branch.type = GitBranch.Type.AHEAD;
                 }
                 return false;
             }
@@ -91,9 +88,9 @@ public class GitRunner {
                 return parseOutLine(line);
             }
         });
-        if (list.isEmpty())
+        if (!branch.current)
             throw new IIOException("Branching failed");
-        return list.get(0);
+        return branch;
     }
 
     public static void pull() throws IOException {
