@@ -241,7 +241,7 @@ public class Main extends JFrame {
         //curBranchTxt.setEnabled(false);
         //newBranchTxt.setEditable(false);
 
-        backToOriginalBranchCb = new JCheckBox("Checkout original branch again, once done.");
+        backToOriginalBranchCb = new JCheckBox("Checkout original branch when done");
         backToOriginalBranchCb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -250,7 +250,7 @@ public class Main extends JFrame {
             }
         });
 
-        pushAfterCommitCb = new JCheckBox("Also Push after Commit");
+        pushAfterCommitCb = new JCheckBox("Commit and Push");
         pushAfterCommitCb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -377,7 +377,7 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(backToOriginalBranchCb, gbc);
+        contentPane.add(pushAfterCommitCb, gbc);
 
         gbc.gridwidth = 3;
         gbc.gridx = 0;
@@ -385,7 +385,7 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(pushAfterCommitCb, gbc);
+        contentPane.add(backToOriginalBranchCb, gbc);
 
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.gridwidth = 3;
