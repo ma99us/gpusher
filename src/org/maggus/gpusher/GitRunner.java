@@ -207,9 +207,17 @@ public class GitRunner {
         runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
-                if (line.startsWith("Branch " + brName + " set up to track remote branch")) {
+                if (line.startsWith("Branch " + brName + " set up to track remote branch ")) {
                     // all good
-                    return true;
+                    return true;        // it is successful
+                }
+                return false;
+            }
+
+            @Override
+            boolean validateErrors(String errors) {
+                if(errors.contains(brName + " -> " + brName)){
+                    return true;        // it is successful
                 }
                 return false;
             }
@@ -243,7 +251,7 @@ public class GitRunner {
                 }
             }
             String errors = sb.toString().trim();
-            if (errors != null && !errors.isEmpty()) {
+            if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.validateErrors(errors))) {
                 throw new IOException(sb.toString().trim());
             }
         } finally {
@@ -300,6 +308,10 @@ public class GitRunner {
         }
 
         boolean parseErrorLine(String line) {
+            return false;   // not handled
+        }
+        
+        boolean validateErrors(String errors) {
             return false;   // not handled
         }
     }
