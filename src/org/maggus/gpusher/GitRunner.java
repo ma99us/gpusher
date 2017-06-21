@@ -23,10 +23,6 @@ public class GitRunner {
         return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
     }
 
-    public static String getWorkingDirectory() {
-        return Paths.get(".").toAbsolutePath().normalize().toString();
-    }
-
     static String getGitVersion() throws IOException {
         StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
@@ -211,9 +207,17 @@ public class GitRunner {
         runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
-                if (line.startsWith("Branch " + brName + " set up to track remote branch")) {
+                if (line.startsWith("Branch " + brName + " set up to track remote branch ")) {
                     // all good
-                    return true;
+                    return true;        // it is successful
+                }
+                return false;
+            }
+
+            @Override
+            boolean validateErrors(String errors) {
+                if(errors.contains(brName + " -> " + brName)){
+                    return true;        // it is successful
                 }
                 return false;
             }
@@ -247,7 +251,7 @@ public class GitRunner {
                 }
             }
             String errors = sb.toString().trim();
-            if (errors != null && !errors.isEmpty()) {
+            if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.validateErrors(errors))) {
                 throw new IOException(sb.toString().trim());
             }
         } finally {
@@ -304,6 +308,10 @@ public class GitRunner {
         }
 
         boolean parseErrorLine(String line) {
+            return false;   // not handled
+        }
+        
+        boolean validateErrors(String errors) {
             return false;   // not handled
         }
     }
@@ -404,7 +412,7 @@ public class GitRunner {
         try {
             System.out.println("isWindows()=" + isWindows());
             System.out.println("isUnix()=" + isUnix());
-            System.out.println("getWorkingDirectory()=" + getWorkingDirectory());
+            //System.out.println("getWorkingDirectory()=" + getWorkingDirectory());
             System.out.println("getGitVersion()=" + getGitVersion());
             System.out.println("listBranches()=" + listBranches());
             checkoutBranch("test", false);

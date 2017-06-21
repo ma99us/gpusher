@@ -36,7 +36,7 @@ public class Main extends JFrame {
         Boolean pushAfterCommit;
 
         public AppConfig() {
-            super("gpshr");
+            super("gpshr", false);  // store setting in workign dir
             configComment = "This is a G-Pusher configuration file";
         }
 
@@ -241,7 +241,7 @@ public class Main extends JFrame {
         //curBranchTxt.setEnabled(false);
         //newBranchTxt.setEditable(false);
 
-        backToOriginalBranchCb = new JCheckBox("Checkout original branch again, once done.");
+        backToOriginalBranchCb = new JCheckBox("Checkout original branch when done");
         backToOriginalBranchCb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -250,7 +250,7 @@ public class Main extends JFrame {
             }
         });
 
-        pushAfterCommitCb = new JCheckBox("Also Push after Commit");
+        pushAfterCommitCb = new JCheckBox("Commit and Push");
         pushAfterCommitCb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -377,7 +377,7 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(backToOriginalBranchCb, gbc);
+        contentPane.add(pushAfterCommitCb, gbc);
 
         gbc.gridwidth = 3;
         gbc.gridx = 0;
@@ -385,7 +385,7 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(pushAfterCommitCb, gbc);
+        contentPane.add(backToOriginalBranchCb, gbc);
 
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.gridwidth = 3;
@@ -417,7 +417,7 @@ public class Main extends JFrame {
 
     private void showAboutDialog(){
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(null, picLabel, "G-Pusher by Mike Gerdov v.2017.06.20", JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(null, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.21", JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -476,7 +476,7 @@ public class Main extends JFrame {
             dataDone = false;
 
             // working dir
-            config.curWorkingDir = GitRunner.getWorkingDirectory();
+            config.curWorkingDir = config.getWorkingDir().getCanonicalPath();
 
             // git branch
             List<GitBranch> branches = GitRunner.listBranches();
