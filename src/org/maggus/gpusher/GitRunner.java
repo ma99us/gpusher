@@ -77,8 +77,11 @@ public class GitRunner {
                 } else if (line.startsWith("Switched to a new branch ")) {
                     GitBranch b = new GitBranch(brName);
                     b.current = true;
+                    //list.get(0).type = GitBranch.Type.LOCAL;
                     list.add(b);
                     return true;
+                } else if(line.startsWith("Your branch is up-to-date") && !list.isEmpty()){
+                    list.get(0).type = GitBranch.Type.UPTODATE;
                 }
                 return false;
             }
@@ -367,7 +370,7 @@ public class GitRunner {
 
     static class GitBranch {
         enum Type {
-            LOCAL, REMOTE
+            LOCAL, BEHIND, AHEAD, UPTODATE
         }
 
         public final String name;
