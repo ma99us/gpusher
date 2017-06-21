@@ -20,9 +20,10 @@ public abstract class Config {
 
     public Config(String appTag, boolean global){
         String tag = appTag.toLowerCase().trim();
-        APP_DIR = "." + tag;
-        CONFIG_FILE_NAME = tag + ".properties";
+        tag = tag.replaceAll("[^a-zA-Z0-9-]", "");
         this.global = global;
+        APP_DIR = "." + tag;
+        CONFIG_FILE_NAME = (!global ? "." : "") + tag + ".properties";
     }
 
     public File getUserDir() {
