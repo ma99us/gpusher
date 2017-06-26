@@ -747,6 +747,7 @@ public class Main extends JFrame {
                 tsStr = "in " + ts + " seconds.";
             Log.log("Done " + tsStr);
 
+            GitRunner.setCommandValidator(null);
             updateGitStatus();
         }
         catch(Exception ex){
