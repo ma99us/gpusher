@@ -509,7 +509,7 @@ public class Main extends JFrame {
             filesLbls.add("Files to Add: " + config.filesToAdd.size());
         if (config.filesToReset != null && !config.filesToReset.isEmpty())
             filesLbls.add("Files to Reset: " + config.filesToReset.size());
-        selectedLbl.setText(Config.listToString(filesLbls, "<none>"));
+        selectedLbl.setText(Config.listToString(filesLbls, "nothing selected"));
         branchPrefixTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         newBranchTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
