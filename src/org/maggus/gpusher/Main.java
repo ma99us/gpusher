@@ -476,7 +476,7 @@ public class Main extends JFrame {
 
     private void showAboutDialog(){
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.21", JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.25", JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -747,6 +747,7 @@ public class Main extends JFrame {
                 tsStr = "in " + ts + " seconds.";
             Log.log("Done " + tsStr);
 
+            GitRunner.setCommandValidator(null);
             updateGitStatus();
         }
         catch(Exception ex){
