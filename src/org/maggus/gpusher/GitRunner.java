@@ -79,6 +79,8 @@ public class GitRunner {
                     branch.type = GitBranch.Type.UPTODATE;
                 } else if(line.startsWith("Your branch is ahead of ")){
                     branch.type = GitBranch.Type.AHEAD;
+                } else if(line.startsWith("Your branch is behind ")){
+                    branch.type = GitBranch.Type.BEHIND;
                 }
                 return false;
             }
