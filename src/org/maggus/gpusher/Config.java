@@ -160,9 +160,9 @@ public abstract class Config {
         T readFromString(String str);
     }
 
-    public static String listToString(List values){
+    public static String listToString(List values, String emptyPrompt){
         if(values == null || values.isEmpty())
-            return "";
+            return emptyPrompt;
         StringBuilder sb = new StringBuilder();
         for(Object val : values){
             if(val == null)

@@ -27,9 +27,12 @@ public class Main extends JFrame {
     class AppConfig extends Config {
         // TODO: maybe do not store some settings globally
         String curWorkingDir;
+        List<GitBranch> gitBranches;
+        List<GitFile> gitFiles;
+        List<GitFile> filesToAdd;
+        List<GitFile> filesToReset;
         GitBranch curBranch;
-        List<GitFile> selectedFiles;
-        String commitMessgae;
+        String commitMessage;
         Boolean commitToNewBranch;
         String branchPrefix;
         Boolean backToOriginalBranch;
@@ -42,15 +45,15 @@ public class Main extends JFrame {
 
         @Override
         void onLoad(Properties props) {
-            commitMessgae = props.getProperty("LAST_COMMIT_MESSAGE");
+            commitMessage = props.getProperty("LAST_COMMIT_MESSAGE");
             commitToNewBranch = parseBoolean(props.getProperty("COMMIT_TO_NEW_BRANCH"));
             branchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
             backToOriginalBranch = parseBoolean(props.getProperty("BACK_TO_ORIGINAL_BRANCH"));
             pushAfterCommit = parseBoolean(props.getProperty("PUSH_AFTER_COMMIT"));
 
             // init controls
-            if(commitMessgae != null)
-                commitMessageTxt.setText(commitMessgae);
+            if(commitMessage != null)
+                commitMessageTxt.setText(commitMessage);
             if(commitToNewBranch != null)
                 commitToNewBranchCb.setSelected(commitToNewBranch);
             if(branchPrefix != null)
@@ -65,7 +68,7 @@ public class Main extends JFrame {
 
         @Override
         void onSave(Properties props) {
-            saveValue(props, "LAST_COMMIT_MESSAGE", commitMessgae);
+            saveValue(props, "LAST_COMMIT_MESSAGE", commitMessage);
             saveValue(props, "COMMIT_TO_NEW_BRANCH", commitToNewBranch);
             saveValue(props, "NEW_BRANCH_PREFIX", branchPrefix);
             saveValue(props, "BACK_TO_ORIGINAL_BRANCH", backToOriginalBranch);
@@ -199,7 +202,26 @@ public class Main extends JFrame {
         changesList.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
-                //persist();
+                // update selected files
+                List<GitFile> selList = (List<GitFile>)changesList.getSelectedValuesList(); // selected only files
+                config.filesToAdd =  new ArrayList<GitFile>();
+                for(GitFile f : selList){
+                    int p0 = config.gitFiles.indexOf(f);
+                    if(p0 < 0)
+                        continue;   // TODO: 2017-06-20 should not happen, or Refesh needed
+                    GitFile gf = config.gitFiles.get(p0);
+                    if(!gf.selected)
+                        config.filesToAdd.add(gf);
+                }
+                // update de-selected files
+                config.filesToReset =  new ArrayList<GitFile>();
+                for(GitFile gf : config.gitFiles){
+                    if(!gf.selected)
+                        continue;
+                    if(!selList.contains(gf))
+                        config.filesToReset.add(gf);
+                }
+
                 updateGUI();
             }
         });
@@ -210,21 +232,21 @@ public class Main extends JFrame {
         commitMessageTxt.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
-                config.commitMessgae = commitMessageTxt.getText();
+                config.commitMessage = commitMessageTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
 
             @Override
             public void removeUpdate(DocumentEvent e) {
-                config.commitMessgae = commitMessageTxt.getText();
+                config.commitMessage = commitMessageTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
 
             @Override
             public void changedUpdate(DocumentEvent e) {
-                config.commitMessgae = commitMessageTxt.getText();
+                config.commitMessage = commitMessageTxt.getText();
                 updateNewBrunchName();
                 updateGUI();
             }
@@ -464,7 +486,7 @@ public class Main extends JFrame {
 
     public void updateNewBrunchName() {
         if(config.commitToNewBranch != null && config.commitToNewBranch){
-            String brName = GitRunner.buildBranchName(config.branchPrefix, config.commitMessgae);
+            String brName = GitRunner.buildBranchName(config.branchPrefix, config.commitMessage);
             newBranchTxt.setText(brName);
         }
         else{
@@ -477,25 +499,41 @@ public class Main extends JFrame {
             curWorkingDirTxt.setText(config.curWorkingDir);
         }
         if(config.curBranch != null){
-            curBranchTxt.setText(config.curBranch.name);
+            String curBrName = config.curBranch.name;
+            if(config.curBranch.type != null)
+                curBrName += "\t(" + config.curBranch.type + ")";
+            curBranchTxt.setText(curBrName);
         }
-        int[] selectedIndices = changesList.getSelectedIndices();
-        if (selectedIndices.length > 0)
-            selectedLbl.setText("Selected files: " + selectedIndices.length);
-        else
-            selectedLbl.setText("Selected files: <none>");
+        List<String> filesLbls = new ArrayList<String>();
+        if (config.filesToAdd != null && !config.filesToAdd.isEmpty())
+            filesLbls.add("Files to Add: " + config.filesToAdd.size());
+        if (config.filesToReset != null && !config.filesToReset.isEmpty())
+            filesLbls.add("Files to Reset: " + config.filesToReset.size());
+        selectedLbl.setText(Config.listToString(filesLbls, "nothing selected"));
         branchPrefixTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         newBranchTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
-        commitBtn.setEnabled(selectedIndices.length > 0);
+        commitBtn.setEnabled(isCommitAvailable() || isPushAvailable());
         List<String> commitLbls = new ArrayList<String>();
         if(config.commitToNewBranch != null && config.commitToNewBranch)
             commitLbls.add("Branch");
-        commitLbls.add("Commit");
-        if(config.pushAfterCommit != null && config.pushAfterCommit)
+        if(isCommitAvailable())
+            commitLbls.add("Commit");
+        if(isPushAvailable())
             commitLbls.add("Push");
-        commitBtn.setText(Config.listToString(commitLbls));
+        commitBtn.setText(Config.listToString(commitLbls, "nothing to do"));
     }
+
+    private boolean isCommitAvailable(){
+        return ((config.filesToAdd != null && !config.filesToAdd.isEmpty())
+                || (config.filesToReset != null && !config.filesToReset.isEmpty()));
+    }
+
+    private boolean isPushAvailable(){
+        return ((isCommitAvailable() && config.pushAfterCommit != null && config.pushAfterCommit)
+                || (!isCommitAvailable() && config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));
+    }
+
 
     public void checkGit() {
         try {
@@ -516,39 +554,40 @@ public class Main extends JFrame {
             config.curWorkingDir = config.getWorkingDir().getCanonicalPath();
 
             // git branch
-            List<GitBranch> branches = GitRunner.listBranches();
-            for(GitBranch b : branches){
+            config.gitBranches = GitRunner.listBranches();
+            for(GitBranch b : config.gitBranches){
                 if(b.current){
                     config.curBranch = b;
                     break;
                 }
             }
 
+            // checkout current branch again, to get it's status
+            if(config.curBranch != null){
+                config.curBranch = GitRunner.checkoutBranch(config.curBranch.name, false);
+            }
+
             // git status
-            List<GitFile> files = GitRunner.listChangedFiles();
-            //if(lastProcs == null || !lastProcs.equals(procs))
-            {
-//                Collections.sort(procs, new Comparator<String>() {        // sort processes alphabetically
+            config.gitFiles = GitRunner.listChangedFiles();
+//                Collections.sort(config.gitFiles, new Comparator<GitFile>() {        // sort alphabetically
 //                    @Override
-//                    public int compare(String o1, String o2) {
-//                        return o1.compareTo(o2);
+//                    public int compare(GitFile o1, GitFile o2) {
+//                        return o1.path.compareTo(o2.path);
 //                    }
 //                });
-                DefaultListModel filesModel = new DefaultListModel<GitFile>();
-                for (GitFile file : files) {
-                    filesModel.addElement(file);
-                }
-                changesList.setModel(filesModel);
-                // restore marked items
-                for (int i = 0; i < filesModel.getSize(); i++) {
-                    GitFile gf = (GitFile) filesModel.get(i);
-                    if (gf.selected) {
-                        changesList.addSelectionInterval(i, i);
-                    }
-                }
-//                lastProcs = procs;
-                updated = true;
+            DefaultListModel filesModel = new DefaultListModel<GitFile>();
+            for (GitFile file : config.gitFiles) {
+                filesModel.addElement(file);
             }
+            changesList.setModel(filesModel);
+            // mark already added files
+            for (int i = 0; i < filesModel.getSize(); i++) {
+                GitFile gf = (GitFile) filesModel.get(i);
+                if (gf.selected) {
+                    changesList.addSelectionInterval(i, i);
+                }
+            }
+            updated = true;
         }
         catch(Exception ex){
             ex.printStackTrace();
@@ -662,42 +701,37 @@ public class Main extends JFrame {
             GitRunner.setCommandValidator(new CommandsLogger());
 
             GitBranch workBranch = config.curBranch;
-            // checkout new branch if needed
-            if(config.commitToNewBranch != null && config.commitToNewBranch){
-                String newBrName = newBranchTxt.getText().trim();
-                workBranch = GitRunner.checkoutBranch(newBrName, true);
-            }
+            if (isCommitAvailable()) {
+                if (config.commitMessage == null || config.commitMessage.isEmpty())
+                    throw new IllegalArgumentException("Commit comment can not be empty");
 
-            List<GitFile> gitFiles = GitRunner.listChangedFiles();  // all git changed files
-            // add selected files to commit
-            List<GitFile> selList = (List<GitFile>)changesList.getSelectedValuesList(); // selected only files
-            for(GitFile f : selList){
-                int p0 = gitFiles.indexOf(f);
-                if(p0 < 0)
-                    continue;   // TODO: 2017-06-20 should not happen, or Refesh needed
-                GitFile gf = gitFiles.get(p0);
-                if(!gf.selected)
-                    GitRunner.addFile(gf.path);
-            }
+                // checkout new branch if needed
+                if (config.commitToNewBranch != null && config.commitToNewBranch) {
+                    String newBrName = newBranchTxt.getText().trim();
+                    if (newBrName == null || newBrName.isEmpty())
+                        throw new IllegalArgumentException("New Branch name can not be empty");
+                    workBranch = GitRunner.checkoutBranch(newBrName, true);
+                }
 
-            // remove unselected files from commit
-            for(GitFile gf : gitFiles){
-                if(!gf.selected)
-                    continue;
-                if(!selList.contains(gf))
-                    GitRunner.unAddFile(gf.path);
-            }
+                // add selected files to commit
+                if (config.filesToAdd != null && !config.filesToAdd.isEmpty())
+                    GitRunner.addFiles(config.filesToAdd);
 
-            // commit
-            GitRunner.commit(config.commitMessgae);
+                // remove unselected files from commit
+                if (config.filesToReset != null && !config.filesToReset.isEmpty())
+                    GitRunner.unAddFiles(config.filesToReset);
+
+                // commit
+                GitRunner.commit(config.commitMessage);
+            }
 
             // push to remote repo if needed
-            if(config.pushAfterCommit != null && config.pushAfterCommit){
+            if(isPushAvailable()){
                 GitRunner.push(workBranch.name);
             }
 
             // checkout original branch if needed
-            if(config.commitToNewBranch != null && config.commitToNewBranch && config.backToOriginalBranch != null && config.backToOriginalBranch){
+            if(isCommitAvailable() && config.commitToNewBranch != null && config.commitToNewBranch && config.backToOriginalBranch != null && config.backToOriginalBranch){
                 GitRunner.checkoutBranch(config.curBranch.name, false);
             }
 
@@ -712,6 +746,8 @@ public class Main extends JFrame {
             else
                 tsStr = "in " + ts + " seconds.";
             Log.log("Done " + tsStr);
+
+            updateGitStatus();
         }
         catch(Exception ex){
             ex.printStackTrace();
@@ -719,7 +755,6 @@ public class Main extends JFrame {
         }
         finally {
             GitRunner.setCommandValidator(null);
-            updateGitStatus();
         }
     }
 
@@ -737,6 +772,7 @@ public class Main extends JFrame {
             if (doc.getLength() != 0)
                 doc.insertString(doc.getLength(), "\n", null);
             doc.insertString(doc.getLength(), line, atr);
+            logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {
             ex.printStackTrace();
         }
