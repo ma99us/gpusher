@@ -531,7 +531,7 @@ public class Main extends JFrame {
 
     private boolean isPushAvailable(){
         return ((isCommitAvailable() && config.pushAfterCommit != null && config.pushAfterCommit)
-                || (config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));
+                || (!isCommitAvailable() && config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));
     }
 
 
@@ -701,30 +701,37 @@ public class Main extends JFrame {
             GitRunner.setCommandValidator(new CommandsLogger());
 
             GitBranch workBranch = config.curBranch;
-            // checkout new branch if needed
-            if(config.commitToNewBranch != null && config.commitToNewBranch){
-                String newBrName = newBranchTxt.getText().trim();
-                workBranch = GitRunner.checkoutBranch(newBrName, true);
+            if (isCommitAvailable()) {
+                if (config.commitMessage == null || config.commitMessage.isEmpty())
+                    throw new IllegalArgumentException("Commit comment can not be empty");
+
+                // checkout new branch if needed
+                if (config.commitToNewBranch != null && config.commitToNewBranch) {
+                    String newBrName = newBranchTxt.getText().trim();
+                    if (newBrName == null || newBrName.isEmpty())
+                        throw new IllegalArgumentException("New Branch name can not be empty");
+                    workBranch = GitRunner.checkoutBranch(newBrName, true);
+                }
+
+                // add selected files to commit
+                if (config.filesToAdd != null && !config.filesToAdd.isEmpty())
+                    GitRunner.addFiles(config.filesToAdd);
+
+                // remove unselected files from commit
+                if (config.filesToReset != null && !config.filesToReset.isEmpty())
+                    GitRunner.unAddFiles(config.filesToReset);
+
+                // commit
+                GitRunner.commit(config.commitMessage);
             }
 
-            // add selected files to commit
-            if(config.filesToAdd != null && !config.filesToAdd.isEmpty())
-                GitRunner.addFiles(config.filesToAdd);
-
-            // remove unselected files from commit
-            if(config.filesToReset != null && !config.filesToReset.isEmpty())
-                GitRunner.unAddFiles(config.filesToReset);
-
-            // commit
-            GitRunner.commit(config.commitMessage);
-
             // push to remote repo if needed
-            if(config.pushAfterCommit != null && config.pushAfterCommit){
+            if(isPushAvailable()){
                 GitRunner.push(workBranch.name);
             }
 
             // checkout original branch if needed
-            if(config.commitToNewBranch != null && config.commitToNewBranch && config.backToOriginalBranch != null && config.backToOriginalBranch){
+            if(isCommitAvailable() && config.commitToNewBranch != null && config.commitToNewBranch && config.backToOriginalBranch != null && config.backToOriginalBranch){
                 GitRunner.checkoutBranch(config.curBranch.name, false);
             }
 
@@ -739,6 +746,8 @@ public class Main extends JFrame {
             else
                 tsStr = "in " + ts + " seconds.";
             Log.log("Done " + tsStr);
+
+            updateGitStatus();
         }
         catch(Exception ex){
             ex.printStackTrace();
@@ -746,7 +755,6 @@ public class Main extends JFrame {
         }
         finally {
             GitRunner.setCommandValidator(null);
-            updateGitStatus();
         }
     }
 
@@ -764,6 +772,7 @@ public class Main extends JFrame {
             if (doc.getLength() != 0)
                 doc.insertString(doc.getLength(), "\n", null);
             doc.insertString(doc.getLength(), line, atr);
+            logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {
             ex.printStackTrace();
         }
