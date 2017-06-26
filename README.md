@@ -9,6 +9,6 @@ GIT version control system is great, but:
 
    If you answered "Yes" to some of these questions, then you might like this G-Pusher tool. Check it out, it’s free and open source. 
 
-Download executable jar-file: [gpusher](https://github.com/ma99us/gpusher/blob/master/gpusher.jar)
+Download executable jar-file: [gpusher](https://github.com/ma99us/gpusher/raw/master/gpusher.jar)
 
 'nuff said
