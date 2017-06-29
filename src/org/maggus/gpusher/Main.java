@@ -3,18 +3,17 @@ package org.maggus.gpusher;
 import org.maggus.gpusher.GitRunner.GitBranch;
 import org.maggus.gpusher.GitRunner.GitFile;
 import org.maggus.gpusher.Log.LogListener;
+import org.maggus.widgets.MyList;
 
 import javax.swing.*;
+import javax.swing.border.BevelBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -91,14 +90,14 @@ public class Main extends JFrame {
 
         @Override
         public void setSelectionInterval(int index0, int index1) {
-            if (!gestureStarted) {
+            //if (!gestureStarted) {
                 if (isSelectedIndex(index0)) {
                     super.removeSelectionInterval(index0, index1);
                 } else {
                     super.addSelectionInterval(index0, index1);
                 }
-            }
-            gestureStarted = true;
+//            }
+            //gestureStarted = true;
         }
 
         @Override
@@ -109,24 +108,60 @@ public class Main extends JFrame {
         }
     }
 
-    class CheckboxListCellRenderer extends JCheckBox implements ListCellRenderer {
+    static class FileListRow extends JPanel{
+        public JCheckBox selectCtrl = new JCheckBox();
+        public JLabel fileCtrl = new JLabel();
+        public JButton diffCtrl = new JButton("diff");
+        public static UIDefaults defaults = javax.swing.UIManager.getDefaults();
 
-        public Component getListCellRendererComponent(JList list, Object value, int index,
-                                                      boolean isSelected, boolean cellHasFocus) {
-            boolean isRunning = true;
-            setComponentOrientation(list.getComponentOrientation());
-            setFont(list.getFont());
-            setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
-            if (!isRunning)
-                setForeground(Color.GRAY);
-            else
-                setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
-            setSelected(isSelected);
-            setEnabled(list.isEnabled());
+        public FileListRow(GitFile value) {
+            super(false);
 
-            setText(value == null ? "" : value.toString());
+            setBorder(BorderFactory.createLineBorder(defaults.getColor("List.background")));
+            setLayout(new GridBagLayout());
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.insets = new Insets(0, 0, 0, 0);
+            gbc.anchor = GridBagConstraints.LINE_START;
+            gbc.gridx = 0;
+            gbc.gridy = 0;
+            gbc.ipadx = 0;
+            gbc.weightx = 0;
+            gbc.weighty = 0;
+            gbc.fill = GridBagConstraints.NONE;
+            selectCtrl.setEnabled(false);
+            selectCtrl.setOpaque(false);
+            add(selectCtrl, gbc);
+            gbc.insets = new Insets(0, 5, 0, 0);
+            gbc.gridx ++;
+            gbc.weightx = 1.0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            add(fileCtrl, gbc);
+            gbc.insets = new Insets(0, 0, 0, 0);
+            gbc.anchor = GridBagConstraints.LINE_END;
+            gbc.gridx ++;
+            gbc.ipadx = 0;
+            gbc.weightx = 0;
+            gbc.fill = GridBagConstraints.NONE;
+            diffCtrl.setMargin(new Insets(0, 5, 0, 5));
+            add(diffCtrl, gbc);
 
-            return this;
+//            addMouseMotionListener(new MouseMotionListener() {
+//                @Override
+//                public void mouseDragged(MouseEvent e) {
+//                    getParent().dispatchEvent(e);
+//                }
+//
+//                @Override
+//                public void mouseMoved(MouseEvent e) {
+//                    getParent().dispatchEvent(e);
+//                }
+//            });
+//            addMouseWheelListener(new MouseWheelListener() {
+//                @Override
+//                public void mouseWheelMoved(MouseWheelEvent e) {
+//                    getParent().dispatchEvent(e);
+//                }
+//            });
         }
     }
 
@@ -137,7 +172,8 @@ public class Main extends JFrame {
     JButton checkoutBranchBtn;
     JButton shellBtn;
     JButton pullBtn;
-    JList changesList;
+    //JList changesList;
+    MyList changesList;
     JLabel selectedLbl;
     JTextField curWorkingDirTxt;
     JTextField curBranchTxt;
@@ -209,11 +245,46 @@ public class Main extends JFrame {
             }
         });
         
-        changesList = new JList();
+        changesList = new MyList();
         changesList.setModel(new DefaultListModel<GitFile>());
         changesList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         changesList.setSelectionModel(new FilesListSelectionModel());
-        changesList.setCellRenderer(new CheckboxListCellRenderer());
+        changesList.setCellRenderer(new MyList.MyListCellRenderer<GitFile>() {
+
+            @Override
+            public Component createListHeaderComponent(MyList<? extends GitFile> list) {
+                return null;
+            }
+
+            @Override
+            public Component createListCellComponent(final MyList<? extends GitFile> list, GitFile value) {
+                FileListRow fileListRow = new FileListRow(value);
+                fileListRow.selectCtrl.addMouseListener(changesList.MyListMouseListener);
+                //fileListRow.addMouseWheelListener(changesList.MyListMouseWheelListener);
+
+                return fileListRow;
+            }
+
+            @Override
+            public void updateListCellComponent(final MyList<? extends GitFile> list, final GitFile value,
+                                                int index, Component component, boolean isSelected, boolean cellHasFocus) {
+                FileListRow cell = (FileListRow) component;
+                cell.selectCtrl.setSelected(isSelected);
+                cell.fileCtrl.setText(value == null ? "" : value.toString());
+                cell.diffCtrl.setVisible(value != null && value.type == GitFile.Type.MODIFIED);
+                if (isSelected) {
+                    cell.setBorder(BorderFactory.createLineBorder(Color.BLUE));
+                    cell.setBackground(cell.defaults.getColor("List.selectionBackground"));
+                    //label.setBackground(defaults.getColor("List.selectionBackground"));
+                    cell.fileCtrl.setForeground(cell.defaults.getColor("List.selectionForeground"));
+                } else {
+                    cell.setBorder(BorderFactory.createLineBorder(cell.defaults.getColor("List.background")));
+                    cell.setBackground(cell.defaults.getColor("List.background"));
+                    //label.setBackground(defaults.getColor("List.background"));
+                    cell.fileCtrl.setForeground(cell.defaults.getColor("List.textForeground"));
+                }
+            }
+        });
         changesList.addListSelectionListener(new ListSelectionListener() {
             @Override
             public void valueChanged(ListSelectionEvent e) {
@@ -492,6 +563,8 @@ public class Main extends JFrame {
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         contentPane.add(scrollPane, gbc);
 
+        SwingUtilities.updateComponentTreeUI(this);
+
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
@@ -643,10 +716,9 @@ public class Main extends JFrame {
             JButton cancelButton = new JButton("Cancel");
             JOptionPane optionPane = new JOptionPane(branchesList);
             optionPane.setOptions(new Object[]{okButton, cancelButton});
-            final JDialog dialog = optionPane.createDialog("Select branch to checkout");
+            final JDialog dialog = optionPane.createDialog(this, "Select branch to checkout");
             branchesList.addMouseListener(new MouseAdapter() {
                 public void mouseClicked(MouseEvent evt) {
-                    JList list = (JList)evt.getSource();
                     if (evt.getClickCount() >= 2) {
                         GitBranch branch = (GitBranch) branchesList.getSelectedValue();
                         dialog.setVisible(false);
