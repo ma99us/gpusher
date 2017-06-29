@@ -135,6 +135,7 @@ public class Main extends JFrame {
 
     JButton refreshBtn;
     JButton checkoutBranchBtn;
+    JButton shellBtn;
     JButton pullBtn;
     JList changesList;
     JLabel selectedLbl;
@@ -171,6 +172,20 @@ public class Main extends JFrame {
                 if(e.getClickCount() == 3){
                     showAboutDialog();
                 }
+            }
+        });
+
+        shellBtn = new JButton("Shell");
+        shellBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Thread worker = new Thread() {
+                    @Override
+                    public void run() {
+                        openShell();
+                    }
+                };
+                worker.start();
             }
         });
 
@@ -337,11 +352,17 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("Working Directory: "), gbc);
-        gbc.gridwidth = 4;
+        gbc.gridwidth = 3;
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         contentPane.add(curWorkingDirTxt, gbc);
+        gbc.anchor = GridBagConstraints.LINE_END;
+        gbc.gridwidth = 1;
+        gbc.gridx = 4;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(shellBtn, gbc);
 
         gbc.anchor = GridBagConstraints.LINE_START;
         gbc.gridwidth = 1;
@@ -616,14 +637,23 @@ public class Main extends JFrame {
                 if (gf.current) {
                     branchesList.addSelectionInterval(i, i);
                 }
-            }         
-            
+            }
             // setup dialog
             JButton okButton = new JButton("Checkout");
             JButton cancelButton = new JButton("Cancel");
             JOptionPane optionPane = new JOptionPane(branchesList);
             optionPane.setOptions(new Object[]{okButton, cancelButton});
             final JDialog dialog = optionPane.createDialog("Select branch to checkout");
+            branchesList.addMouseListener(new MouseAdapter() {
+                public void mouseClicked(MouseEvent evt) {
+                    JList list = (JList)evt.getSource();
+                    if (evt.getClickCount() >= 2) {
+                        GitBranch branch = (GitBranch) branchesList.getSelectedValue();
+                        dialog.setVisible(false);
+                        checkoutBranch(branch.name);
+                    }
+                }
+            });
             okButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -756,6 +786,48 @@ public class Main extends JFrame {
         }
         finally {
             GitRunner.setCommandValidator(null);
+        }
+    }
+
+    public void openShell(){
+        try{
+            if(GitRunner.isWindows())
+            {
+                String bPath = GitRunner.findSystemPathForExecutable("bash");
+                if(bPath != null) {
+                    GitRunner.runCommand("cmd /c start bash", null);    //  bash found in system path
+                    return;
+                }
+                bPath = GitRunner.findPathForGitBash();
+                if(bPath != null) {
+                    GitRunner.runCommand("cmd /c start cmd /c \"" + bPath + "\"", null);    //  bash found with git binary
+                    return;
+                }
+                else
+                    GitRunner.runCommand("cmd.exe /c start", null);     // fallback to default cmd
+            }
+            else{
+                String tPath = GitRunner.findSystemPathForExecutable("gnome-terminal");
+                if(tPath != null) {
+                    GitRunner.runCommand("gnome-terminal", null);
+                    return;
+                }
+                tPath = GitRunner.findSystemPathForExecutable("konsole");
+                if(tPath != null) {
+                    GitRunner.runCommand("konsole", null);
+                    return;
+                }
+                tPath = GitRunner.findSystemPathForExecutable("xterm");
+                if(tPath != null) {
+                    GitRunner.runCommand("xterm", null);
+                    return;
+                }
+                GitRunner.runCommand("/bin/bash", null);
+            }
+        }
+        catch(Exception ex){
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
         }
     }
 
