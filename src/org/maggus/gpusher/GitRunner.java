@@ -2,9 +2,9 @@ package org.maggus.gpusher;
 
 import javax.imageio.IIOException;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -23,7 +23,65 @@ public class GitRunner {
         return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
     }
 
-    static String getGitVersion() throws IOException {
+    public static String findSystemPathForExecutable(String exec){
+        StringBuilder sb = new StringBuilder();
+        try {
+            if (isWindows()) {
+                runCommand("where " + exec, new CommandOutputParser() {
+                    @Override
+                    boolean parseOutLine(String line) {
+                        File f = new File(line);
+                        if (f.exists() && f.isFile()) {
+                            sb.append(f.getAbsolutePath().toString());
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+            } else {
+                runCommand("which " + exec, new CommandOutputParser() {
+                    @Override
+                    boolean parseOutLine(String line) {
+                        File f = new File(line);
+                        if (f.exists() && f.isFile()) {
+                            sb.append(f.getAbsolutePath().toString());
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+            }
+        } catch (IOException ex) {
+            // no-op
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    public static String findPathForGitBash(){
+        if(!isWindows())
+            return null;
+        String gPath = findSystemPathForExecutable("git");
+        if(gPath == null)
+            return null;
+        gPath = gPath.toLowerCase();
+        String bPath = null;
+        int p0 = gPath.lastIndexOf("\\git\\cmd\\");
+        if(bPath == null && p0 >= 0){
+            bPath = gPath.substring(0, p0) + "\\git\\bin\\bash.exe";
+        }
+        p0 = gPath.lastIndexOf("\\bin\\");
+        if(bPath == null && p0 >= 0){
+            bPath = gPath.substring(0, p0) + "\\bin\\bash.exe";
+        }
+        if(bPath == null)
+            return null;
+        File f = new File(bPath);
+        if (!f.exists() || !f.isFile())
+            return null;
+        return f.getAbsolutePath().toString();
+    }
+
+    public static String getGitVersion() throws IOException {
         StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
             @Override
@@ -96,7 +154,15 @@ public class GitRunner {
     }
 
     public static void pull() throws IOException {
-        runCommand("git pull", null);
+        runCommand("git pull", new CommandOutputParser(){
+            @Override
+            boolean validateErrors(String errors) {
+                if(errors.contains("* [new tag]") || errors.contains("* [new branch]")){
+                    return true;     // it is successful
+                }
+                return false;
+            }
+        });
     }
         
     public static List<GitFile> listChangedFiles() throws IOException {
@@ -161,24 +227,6 @@ public class GitRunner {
                     files.add(f);
                     return true;
                 }
-//                    String[] tokens = line.split("\\s+");
-//                    if (tokens.length < 6)
-//                        continue;
-//                    Double size = safeParseDouble(tokens[tokens.length - 2]);
-//                    if (size == null)
-//                        continue;
-//                    Integer pid = safeParseInteger(tokens[tokens.length - 5]);
-//                    if (pid == null)
-//                        continue;
-//                    String task = "";
-//                    for (int i = 0; i < tokens.length - 5; i++) {
-//                        if (!task.isEmpty())
-//                            task += " ";
-//                        task += tokens[i];
-//                    }
-//                    Proc t = new Proc(task, pid.toString());
-                //out.println(t);
-                //files.add(t);
                 return false;
             }
         });
@@ -233,7 +281,7 @@ public class GitRunner {
         });
     }
 
-    private static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
+    public static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
         if (validator != null && !validator.preValidateCommand(command))
             return;
         System.out.println("runCommand: " + command); // #debug
