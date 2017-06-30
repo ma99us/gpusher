@@ -105,6 +105,7 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
         this.model = model;
 		if(this.model != null)
 			this.model.addListDataListener(this);
+        getSelectionModel().clearSelection();
         build();
     }
 
