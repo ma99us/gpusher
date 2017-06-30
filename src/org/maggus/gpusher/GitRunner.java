@@ -254,6 +254,7 @@ public class GitRunner {
     }
 
     public static void commit(String comment) throws IOException {
+        comment = comment.replaceAll("\"", "'");
         String[] split = comment.split("\\r\\n|\\n|\\r");
         StringBuilder sb = new StringBuilder();
         for(String line: split){

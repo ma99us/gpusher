@@ -323,6 +323,8 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 	@Override
 	public void intervalAdded(ListDataEvent e) {
 		for (int i = e.getIndex0(); i <= e.getIndex1(); i++) {
+            if(model == null || model.size() <= i)
+                continue;
 			E value = model.getElementAt(i);
 			Component item = cellRenderer.createListCellComponent(MyList.this, value);
 			cellRenderer.updateListCellComponent(MyList.this, value, i, item, isSelectedIndex(i), false);
@@ -353,7 +355,7 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 
 		//update all items further in the list
 		for (int i = e.getIndex0(); i < model.getSize(); i++) {
-			E value = model.getElementAt(i);
+            E value = model.getElementAt(i);
 			Component item = view.getComponent(i);
 			cellRenderer.updateListCellComponent(MyList.this, value, i, item, isSelectedIndex(i), false);
 		}
@@ -364,7 +366,9 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 	@Override
 	public void contentsChanged(ListDataEvent e) {
 		for (int i = e.getIndex0(); i <= e.getIndex1(); i++) {
-			E value = model.getElementAt(i);
+            if(model == null || model.size() <= i)
+                continue;
+            E value = model.getElementAt(i);
 			Component item = view.getComponent(i);
 			cellRenderer.updateListCellComponent(MyList.this, value, i, item, isSelectedIndex(i), false);
 		}
@@ -374,6 +378,8 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
     @Override
     public void valueChanged(ListSelectionEvent e) {
         for (int i = e.getFirstIndex(); i <= e.getLastIndex(); i++) {
+            if(model == null || model.size() <= i)
+                continue;
             E value = model.getElementAt(i);
             Component item = view.getComponent(i);
             cellRenderer.updateListCellComponent(MyList.this, value, i, item, isSelectedIndex(i), false);
