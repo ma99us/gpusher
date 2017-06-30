@@ -1,15 +1,7 @@
 package org.maggus.widgets;
 
-import org.maggus.gpusher.GitRunner;
-
 import java.awt.*;
-import java.awt.List;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
-import java.awt.datatransfer.UnsupportedFlavorException;
-import java.awt.dnd.*;
 import java.awt.event.*;
-import java.io.IOException;
 import java.util.*;
 
 import javax.swing.*;
@@ -26,14 +18,15 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 	private MyListCellRenderer<E> cellRenderer;
     private ListSelectionModel selectionModel;
     private ListSelectionListener selectionListener;
-	//private int curSelIdx = -1;
-	//private Component curSelComponent;
 	private JScrollPane scrollPane;
 	private final JPanel view;
 	private Component hdrComponent;
-	//private boolean hasHeader;
+    private Color selectionForeground = uiDefaults.getColor("List.selectionForeground");
+    private Color selectionBackground = uiDefaults.getColor("List.selectionBackground");
+    private Color selectionBorderColor = uiDefaults.getColor("activeCaptionBorder");    // FIXME: 2017-06-30 Not quite the right color
+    public static final UIDefaults uiDefaults = javax.swing.UIManager.getDefaults();
 
-	public MyList() {
+    public MyList() {
 		this(null, null);
 	}
 
@@ -60,17 +53,28 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 				Component component = view.getComponentAt(point);
 				if(component != null) {
 					int idx = findComponentIndex(component);
+                    // select list row under the mouse
 					if(idx >= 0)
 						setSelectionInterval(idx, idx);
 				}
 			}
 		});
         setSelectionModel(new DefaultListSelectionModel());
+        // setup default colors
+        Color bgColor = uiDefaults.getColor("List.background");
+        scrollPane.setBackground(bgColor);
+        view.setBackground(bgColor);
+        view1.setBackground(bgColor);
+        setBackground(bgColor);
+        setForeground(uiDefaults.getColor("List.foreground"));
 		build();
 	}
 
+    /**
+     * Propagate mouse event from list row widget to the whole parent MyList
+     * @param me
+     */
 	public void propagateMouseEvent(MouseEvent me){
-        // propagate mouse event to parent
         Point l1 = scrollPane.getLocationOnScreen();
         Point l0 = me.getComponent().getLocationOnScreen();
         l0.move(l0.x - l1.x, l0.y - l1.y);
@@ -105,7 +109,7 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
         this.model = model;
 		if(this.model != null)
 			this.model.addListDataListener(this);
-        getSelectionModel().clearSelection();
+        clearSelection();       // remove all current selections
         build();
     }
 
@@ -216,7 +220,31 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
         return selectedItems;
     }
 
-	public int findComponentIndex(Component item) {
+    public Color getSelectionForeground() {
+        return selectionForeground;
+    }
+
+    public void setSelectionForeground(Color selectionForeground) {
+        this.selectionForeground = selectionForeground;
+    }
+
+    public void setSelectionBorderColor(Color selectionBorderColor) {
+        this.selectionBorderColor = selectionBorderColor;
+    }
+
+    public Color getSelectionBorderColor() {
+        return selectionBorderColor;
+    }
+
+    public Color getSelectionBackground() {
+        return selectionBackground;
+    }
+
+    public void setSelectionBackground(Color selectionBackground) {
+        this.selectionBackground = selectionBackground;
+    }
+
+    private int findComponentIndex(Component item) {
 		for(int i=0; i < view.getComponentCount(); i++){
 			if(item == view.getComponent(i))
 				return i;
@@ -246,6 +274,9 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 		revalidate();
 	}
 
+    /**
+     * Update all list rows
+     */
 	public void refresh() {
 		for (int i = 0; i < model.getSize(); i++) {
 			E value = model.getElementAt(i);
@@ -286,7 +317,6 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 		Component columnHeader = getColumnHeader(colIdx);
 		if(columnHeader == null)
 			return null;
-		//return columnHeader.getWidth();		// FIXME: use preferred size inste
 		return columnHeader.getPreferredSize().width;
 	}
 	
@@ -298,7 +328,9 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 			cellRenderer.updateListCellComponent(MyList.this, value, i, item, isSelectedIndex(i), false);
 			view.add(item, i);
 		}
-		
+
+        // TODO: 2017-06-30 fix old selected indexes in SelectionModel accordingly
+
 		//update all items further in the list
 		for (int i = e.getIndex1()+1; i < model.getSize(); i++) {
 			E value = model.getElementAt(i);
@@ -317,6 +349,8 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 
         removeSelectionInterval(e.getIndex0(),  e.getIndex1());
 
+        // TODO: 2017-06-30 fix old selected indexes in SelectionModel accordingly
+
 		//update all items further in the list
 		for (int i = e.getIndex0(); i < model.getSize(); i++) {
 			E value = model.getElementAt(i);
@@ -330,12 +364,9 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 	@Override
 	public void contentsChanged(ListDataEvent e) {
 		for (int i = e.getIndex0(); i <= e.getIndex1(); i++) {
-			//view.remove(i);
 			E value = model.getElementAt(i);
 			Component item = view.getComponent(i);
 			cellRenderer.updateListCellComponent(MyList.this, value, i, item, isSelectedIndex(i), false);
-			//Component item = renderCell(value, i);
-			//view.add(item, i);
 		}
 		revalidate();
 	}
@@ -349,7 +380,10 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
         }
     }
 
-	public final MouseListener MyListMouseListener = new MouseListener() {
+    /**
+     * Default mouse listener to assign to widgets in the list row, to handle mouse events by list itself, rather then widget
+     */
+	public final MouseListener MyListRowItemMouseListener = new MouseListener() {
 		@Override
 		public void mouseClicked(MouseEvent e) {
             propagateMouseEvent(e);
@@ -375,13 +409,6 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
             propagateMouseEvent(e);
 		}
 	};
-
-    public final MouseWheelListener MyListMouseWheelListener = new MouseWheelListener() {
-        @Override
-        public void mouseWheelMoved(MouseWheelEvent e) {
-            scrollPane.dispatchEvent(e);
-        }
-    };
 
     public static interface MyListCellRenderer<E> {
 		Component createListHeaderComponent(MyList<? extends E> list);
@@ -423,12 +450,12 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 			@Override
 			public Component createListCellComponent(final MyList<? extends String> list, String value) {
 				final JPanel cell = new JPanel(false);
-				cell.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+				cell.setBorder(BorderFactory.createLineBorder(list.getBackground()));
 				cell.setLayout(new BorderLayout());
 
                 JCheckBox numLabel = new JCheckBox();
                 numLabel.setOpaque(false);
-                numLabel.addMouseListener(list.MyListMouseListener);
+                numLabel.addMouseListener(list.MyListRowItemMouseListener);
 				Integer colW = list.getHeaderColumnWidth(0);
 				if(colW != null)
 					numLabel.setPreferredSize(new Dimension(colW, numLabel.getHeight()));
@@ -456,15 +483,14 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 				numLabel.setText(""+(index +1)+".");
                 JLabel label = (JLabel) cell.getComponent(1);
 				label.setText(value);
-				UIDefaults defaults = javax.swing.UIManager.getDefaults();
 				if (isSelected) {
-					cell.setBackground(defaults.getColor("List.selectionBackground"));
-                    //label.setBackground(defaults.getColor("List.selectionBackground"));
-					label.setForeground(defaults.getColor("List.selectionForeground"));
+                    cell.setBorder(BorderFactory.createLineBorder(list.getSelectionBorderColor()));
+                    cell.setBackground(list.getSelectionBackground());
+                    cell.setForeground(list.getSelectionForeground());
 				} else {
-					cell.setBackground(defaults.getColor("List.background"));
-                    //label.setBackground(defaults.getColor("List.background"));
-					label.setForeground(defaults.getColor("List.textForeground"));
+                    cell.setBorder(BorderFactory.createLineBorder(list.getBackground()));
+                    cell.setBackground(list.getBackground());
+                    cell.setForeground(list.getForeground());
 				}
 				//JButton button = (JButton) cell.getComponent(2);
 			}

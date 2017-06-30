@@ -6,7 +6,6 @@ import org.maggus.gpusher.Log.LogListener;
 import org.maggus.widgets.MyList;
 
 import javax.swing.*;
-import javax.swing.border.BevelBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
@@ -108,16 +107,15 @@ public class Main extends JFrame {
         }
     }
 
-    static class FileListRow extends JPanel{
+    private class FileListRow extends JPanel{
         public JCheckBox selectCtrl = new JCheckBox();
         public JLabel fileCtrl = new JLabel();
         public JButton diffCtrl = new JButton("diff");
-        public static UIDefaults defaults = javax.swing.UIManager.getDefaults();
 
-        public FileListRow(GitFile value) {
+        public FileListRow(MyList list, GitFile value) {
             super(false);
 
-            setBorder(BorderFactory.createLineBorder(defaults.getColor("List.background")));
+            setBorder(BorderFactory.createLineBorder(list.getBackground()));
             setLayout(new GridBagLayout());
             GridBagConstraints gbc = new GridBagConstraints();
             gbc.insets = new Insets(0, 0, 0, 0);
@@ -144,24 +142,12 @@ public class Main extends JFrame {
             gbc.fill = GridBagConstraints.NONE;
             diffCtrl.setMargin(new Insets(0, 5, 0, 5));
             add(diffCtrl, gbc);
-
-//            addMouseMotionListener(new MouseMotionListener() {
-//                @Override
-//                public void mouseDragged(MouseEvent e) {
-//                    getParent().dispatchEvent(e);
-//                }
-//
-//                @Override
-//                public void mouseMoved(MouseEvent e) {
-//                    getParent().dispatchEvent(e);
-//                }
-//            });
-//            addMouseWheelListener(new MouseWheelListener() {
-//                @Override
-//                public void mouseWheelMoved(MouseWheelEvent e) {
-//                    getParent().dispatchEvent(e);
-//                }
-//            });
+            diffCtrl.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    showDiffDialog(value.path);
+                }
+            });
         }
     }
 
@@ -188,6 +174,8 @@ public class Main extends JFrame {
 
     public Main() throws HeadlessException {
         super("G-Pusher");
+
+        SwingUtilities.updateComponentTreeUI(this);
 
         // setup controls widgets
         refreshBtn = new JButton("Refresh");
@@ -258,9 +246,8 @@ public class Main extends JFrame {
 
             @Override
             public Component createListCellComponent(final MyList<? extends GitFile> list, GitFile value) {
-                FileListRow fileListRow = new FileListRow(value);
-                fileListRow.selectCtrl.addMouseListener(changesList.MyListMouseListener);
-                //fileListRow.addMouseWheelListener(changesList.MyListMouseWheelListener);
+                FileListRow fileListRow = new FileListRow(list, value);
+                fileListRow.selectCtrl.addMouseListener(changesList.MyListRowItemMouseListener);
 
                 return fileListRow;
             }
@@ -273,15 +260,13 @@ public class Main extends JFrame {
                 cell.fileCtrl.setText(value == null ? "" : value.toString());
                 cell.diffCtrl.setVisible(value != null && value.type == GitFile.Type.MODIFIED);
                 if (isSelected) {
-                    cell.setBorder(BorderFactory.createLineBorder(Color.BLUE));
-                    cell.setBackground(cell.defaults.getColor("List.selectionBackground"));
-                    //label.setBackground(defaults.getColor("List.selectionBackground"));
-                    cell.fileCtrl.setForeground(cell.defaults.getColor("List.selectionForeground"));
+                    cell.setBorder(BorderFactory.createLineBorder(MyList.uiDefaults.getColor("activeCaptionBorder")));
+                    cell.setBackground(list.getSelectionBackground());
+                    cell.fileCtrl.setForeground(list.getSelectionForeground());
                 } else {
-                    cell.setBorder(BorderFactory.createLineBorder(cell.defaults.getColor("List.background")));
-                    cell.setBackground(cell.defaults.getColor("List.background"));
-                    //label.setBackground(defaults.getColor("List.background"));
-                    cell.fileCtrl.setForeground(cell.defaults.getColor("List.textForeground"));
+                    cell.setBorder(BorderFactory.createLineBorder(list.getBackground()));
+                    cell.setBackground(list.getBackground());
+                    cell.fileCtrl.setForeground(list.getForeground());
                 }
             }
         });
@@ -471,7 +456,7 @@ public class Main extends JFrame {
         gbc.weightx = 1.0;
         gbc.weighty = 0.6;
         gbc.fill = GridBagConstraints.BOTH;
-        contentPane.add(new JScrollPane(changesList), gbc);
+        contentPane.add(changesList, gbc);
 
         gbc.gridwidth = 5;
         gbc.gridx = 0;
@@ -563,14 +548,12 @@ public class Main extends JFrame {
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         contentPane.add(scrollPane, gbc);
 
-        SwingUtilities.updateComponentTreeUI(this);
-
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
     private void showAboutDialog(){
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.25", JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.06.29", JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -695,7 +678,85 @@ public class Main extends JFrame {
             }
         }
     }
-    
+
+    public void showDiffDialog(String file) {
+        try {
+            JTextPane diffTa = new JTextPane();
+            diffTa.setEditable(false);
+            diffTa.setContentType("text/html");
+            diffTa.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+            final StyledDocument doc = diffTa.getStyledDocument();
+
+            GitRunner.runCommand("git diff \"" + file + "\"", new GitRunner.CommandOutputParser() {
+                @Override
+                boolean parseOutLine(String line) {
+                    try {
+                        SimpleAttributeSet atr = new SimpleAttributeSet();
+                        StyleConstants.setLineSpacing(atr, 0);
+                        if(line.startsWith("+++") || line.startsWith("---")){
+                            //do nothing
+                        }
+                        else if(line.startsWith("+")) {
+                            StyleConstants.setForeground(atr, Color.GREEN.darker());
+                            StyleConstants.setBold(atr, true);
+                        }
+                        else if(line.startsWith("-")) {
+                            StyleConstants.setForeground(atr, Color.RED);
+                            StyleConstants.setBold(atr, true);
+                        }
+                        else if(line.startsWith("@@")){
+                            StyleConstants.setForeground(atr, Color.CYAN.darker());
+                            StyleConstants.setBold(atr, true);
+                            StyleConstants.setItalic(atr, true);
+                        }
+                        if (doc.getLength() != 0)
+                            doc.insertString(doc.getLength(), "\n", atr);
+                        doc.insertString(doc.getLength(), line, atr);
+                    } catch (BadLocationException e) {
+                        e.printStackTrace();
+                    }
+                    return true;
+                }
+            });
+
+            // setup dialog
+            JDialog dialog = new JDialog(this);
+            dialog.setTitle("Diff: " + file);
+            dialog.setLayout(new GridBagLayout());
+            JScrollPane scrollPane = new JScrollPane(diffTa);
+            scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.anchor = GridBagConstraints.CENTER;
+            gbc.gridx = 0; gbc.gridy = 0;
+            gbc.weightx = 1.0; gbc.weighty = 1.0;
+            gbc.fill = GridBagConstraints.BOTH;
+            dialog.add(scrollPane, gbc);
+            JButton cancelButton = new JButton("Cancel");
+            cancelButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    dialog.setVisible(false);
+                }
+            });
+            gbc.gridx = 0; gbc.gridy = 1;
+            gbc.weightx = 0.0; gbc.weighty = 0.0;
+            gbc.fill = GridBagConstraints.NONE;
+            dialog.add(cancelButton, gbc);
+            dialog.pack();
+            Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+            int width  = Math.min(dialog.getSize().width, (int)(screenSize.width * 0.8));
+            int height = Math.min(dialog.getSize().height, (int)(screenSize.height * 0.8));
+            dialog.setSize( width, height );
+            dialog.setPreferredSize(new Dimension(width, height));
+            dialog.setLocationRelativeTo(this);
+            dialog.setVisible(true);        // show dialog
+        }
+        catch(Exception ex){
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
+        }
+    }
+
     public void showCheckoutDialog() {
         try {
             DefaultListModel branchesModel = new DefaultListModel<GitBranch>();
