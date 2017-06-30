@@ -314,7 +314,7 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 			view.remove(e.getIndex0());
 		}
 
-        getSelectionModel().removeSelectionInterval(e.getIndex0(),  e.getIndex1());
+        removeSelectionInterval(e.getIndex0(),  e.getIndex1());
 
 		//update all items further in the list
 		for (int i = e.getIndex0(); i < model.getSize(); i++) {
