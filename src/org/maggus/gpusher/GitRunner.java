@@ -254,7 +254,15 @@ public class GitRunner {
     }
 
     public static void commit(String comment) throws IOException {
-        runCommand("git commit -m \"" + comment + "\"", null);
+        comment = comment.replaceAll("\"", "'");
+        String[] split = comment.split("\\r\\n|\\n|\\r");
+        StringBuilder sb = new StringBuilder();
+        for(String line: split){
+            if(line == null || line.trim().isEmpty())
+                continue;
+            sb.append(" -m \"" + line.trim()+"\"");
+        }
+        runCommand("git commit" + sb.toString(), null);
     }
 
     public static void push(String brName) throws IOException {
