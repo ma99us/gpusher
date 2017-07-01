@@ -157,7 +157,8 @@ public class GitRunner {
         runCommand("git pull", new CommandOutputParser(){
             @Override
             boolean validateErrors(String errors) {
-                if(errors.contains("* [new tag]") || errors.contains("* [new branch]")){
+                // FIXME: 2017-07-01 Some sucessful pull commands throw some text in error output for soem reason. Figure out how to parse that
+                if(errors.contains("* [new tag]") || errors.contains("* [new branch]")){    // hack!
                     return true;     // it is successful
                 }
                 return false;

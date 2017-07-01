@@ -974,11 +974,14 @@ public class Main extends JFrame {
                 StyleConstants.setForeground(atr, Color.RED);
             }
             //String line = Log.getTimestamp() + ": " + text;
-            String line = text;
+            String line = text.trim();
             Document doc = logTa.getStyledDocument();
-            if (doc.getLength() != 0)
+            //int rowStart = Utilities.getRowStart(logTa, doc.getLength());
+            if (doc.getLength() != 0 && !doc.getText(doc.getLength()-2, 2).endsWith("\n"))
                 doc.insertString(doc.getLength(), "\n", atr);
             doc.insertString(doc.getLength(), line, atr);
+            if(text.endsWith("\n"))
+                doc.insertString(doc.getLength(), "\n", null);
             logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {
             ex.printStackTrace();
