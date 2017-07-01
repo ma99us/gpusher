@@ -968,20 +968,21 @@ public class Main extends JFrame {
     void onLog(Log.Level level, String text) {
         try {
             SimpleAttributeSet atr = new SimpleAttributeSet();
+            StyleConstants.setLineSpacing(atr, 0);
             if (level == Log.Level.warn) {
                 StyleConstants.setForeground(atr, Color.ORANGE);
             } else if (level == Log.Level.err) {
                 StyleConstants.setForeground(atr, Color.RED);
             }
             //String line = Log.getTimestamp() + ": " + text;
-            String line = text.trim();
+            String line = text;
             Document doc = logTa.getStyledDocument();
             //int rowStart = Utilities.getRowStart(logTa, doc.getLength());
             if (doc.getLength() != 0 && !doc.getText(doc.getLength()-2, 2).endsWith("\n"))
                 doc.insertString(doc.getLength(), "\n", atr);
             doc.insertString(doc.getLength(), line, atr);
-            if(text.endsWith("\n"))
-                doc.insertString(doc.getLength(), "\n", null);
+//            if(text.endsWith("\n"))
+//                doc.insertString(doc.getLength(), "\n", null);
             logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {
             ex.printStackTrace();
