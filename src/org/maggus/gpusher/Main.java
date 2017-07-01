@@ -617,7 +617,7 @@ public class Main extends JFrame {
         try {
             dataDone = false;
             String ver = GitRunner.getGitVersion();
-            Log.log(ver);
+            Log.log(ver + "\n");
         } catch (Exception ex) {
             Log.log(Log.Level.err, ex.getMessage());
         }
