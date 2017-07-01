@@ -12,11 +12,11 @@ GIT version control system is great, but:
 ## Download executable jar-file (Requires Java 1.7+): [gpusher.jar](https://github.com/ma99us/gpusher/raw/master/gpusher.jar)
 
 ### Screenshots:
+###### Main dialog:
 ![Main dialog](doc/gpusher_scr1.png?raw=true "gpusher screenshot 1")
-Main dialog
+###### Checkout a branch:
 ![Checkout branch](doc/gpusher_scr2.png?raw=true "gpusher screenshot 2")
-Checkout branch
+###### See local changes to a file:
 ![Diff file](doc/gpusher_scr3.png?raw=true "gpusher screenshot 3")
-Diff file
 
-'nuff said
+_'nuff said_
