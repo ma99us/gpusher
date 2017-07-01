@@ -977,7 +977,7 @@ public class Main extends JFrame {
             String line = text;
             Document doc = logTa.getStyledDocument();
             if (doc.getLength() != 0)
-                doc.insertString(doc.getLength(), "\n", null);
+                doc.insertString(doc.getLength(), "\n", atr);
             doc.insertString(doc.getLength(), line, atr);
             logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {
