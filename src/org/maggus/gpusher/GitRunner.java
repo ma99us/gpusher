@@ -213,15 +213,28 @@ public class GitRunner {
                     return true;
                 } else if (ready && section == 2 && !line.trim().isEmpty()) {
                     // modified files
+                    String file = null;
+                    GitFile.Type type = null;
                     String head = "modified:";
                     int p0 = line.indexOf(head);
-                    String file = line.substring(p0 + head.length()).trim();
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.MODIFIED;
+                    }
+                    head = "deleted:";
+                    p0 = line.indexOf(head);
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.DELETED;
+                    }
+                    if (file == null || type == null)
+                        return false;       // Unsupported parsing!
                     GitFile f = new GitFile(file);
-                    f.type = GitFile.Type.MODIFIED;
+                    f.type = type;
                     files.add(f);
                     return true;
                 } else if (ready && section == 3 && !line.trim().isEmpty()) {
-                    // untracked files
+                    // untracked/ignored files
                     String file = line.trim();
                     GitFile f = new GitFile(file);
                     files.add(f);
@@ -383,7 +396,7 @@ public class GitRunner {
 
     static class GitFile {
         enum Type {
-            NEW, MODIFIED, IGNORED
+            NEW, MODIFIED, DELETED, IGNORED
         }
 
         ;

@@ -602,6 +602,7 @@ public class Main extends JFrame {
     }
 
     private boolean isCommitAvailable(){
+        // TODO: 2017-07-01 Allow commits when files already added but not committed yet
         return ((config.filesToAdd != null && !config.filesToAdd.isEmpty())
                 || (config.filesToReset != null && !config.filesToReset.isEmpty()));
     }
@@ -616,7 +617,7 @@ public class Main extends JFrame {
         try {
             dataDone = false;
             String ver = GitRunner.getGitVersion();
-            Log.log(ver);
+            Log.log(ver + "\n");
         } catch (Exception ex) {
             Log.log(Log.Level.err, ex.getMessage());
         }
@@ -976,7 +977,7 @@ public class Main extends JFrame {
             String line = text;
             Document doc = logTa.getStyledDocument();
             if (doc.getLength() != 0)
-                doc.insertString(doc.getLength(), "\n", null);
+                doc.insertString(doc.getLength(), "\n", atr);
             doc.insertString(doc.getLength(), line, atr);
             logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {

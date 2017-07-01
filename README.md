@@ -9,6 +9,14 @@ GIT version control system is great, but:
 
    If you answered "Yes" to some of these questions, then you might like this G-Pusher tool. Check it out, it’s free and open source. 
 
-Download executable jar-file (Requires Java 1.7+): [gpusher.jar](https://github.com/ma99us/gpusher/raw/master/gpusher.jar)
+## Download executable jar-file (Requires Java 1.7+): [gpusher.jar](https://github.com/ma99us/gpusher/raw/master/gpusher.jar)
 
-'nuff said
+### Screenshots:
+###### Main dialog:
+![Main dialog](doc/gpusher_scr1.png?raw=true "gpusher screenshot 1")
+###### Checkout a branch:
+![Checkout branch](doc/gpusher_scr2.png?raw=true "gpusher screenshot 2")
+###### See local changes to a file:
+![Diff file](doc/gpusher_scr3.png?raw=true "gpusher screenshot 3")
+
+_'nuff said_
