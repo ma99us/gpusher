@@ -9,9 +9,11 @@ GIT version control system is great, but:
 
    If you answered "Yes" to some of these questions, then you might like this G-Pusher tool. Check it out, it’s free and open source. 
 
-Download executable jar-file (Requires Java 1.7+): [gpusher.jar](https://github.com/ma99us/gpusher/raw/master/gpusher.jar)
+## Download executable jar-file (Requires Java 1.7+): [gpusher.jar](https://github.com/ma99us/gpusher/raw/master/gpusher.jar)
 
-Screenshots:
+### Screenshots:
 ![Main dialog](/doc/gpusher_scr1.png?raw=true "gpusher screenshot 1")
+![Checkout branch](/doc/gpusher_scr2.png?raw=true "gpusher screenshot 2")
+![Diff file](/doc/gpusher_scr3.png?raw=true "gpusher screenshot 3")
 
 'nuff said
