@@ -602,6 +602,7 @@ public class Main extends JFrame {
     }
 
     private boolean isCommitAvailable(){
+        // TODO: 2017-07-01 Allow commits when files already added but not committed yet
         return ((config.filesToAdd != null && !config.filesToAdd.isEmpty())
                 || (config.filesToReset != null && !config.filesToReset.isEmpty()));
     }
