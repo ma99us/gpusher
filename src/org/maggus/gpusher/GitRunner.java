@@ -96,7 +96,24 @@ public class GitRunner {
     }
 
     public static void pull() throws IOException {
-        runCommand("git pull", null);
+        runCommand("git pull", new CommandOutputParser() {
+          
+            @Override
+            boolean invalidateOutput(String output) {
+                if(output.startsWith("error: ")){
+                    return true;        // it is unsuccessful
+                }
+                return false;
+            }
+          
+            @Override
+            boolean validateErrors(String errors) {
+                if(errors.startsWith("From ")){
+                    return true;        // it is successful
+                }
+                return false;
+            }
+        });
     }
         
     public static List<GitFile> listChangedFiles() throws IOException {
@@ -161,24 +178,6 @@ public class GitRunner {
                     files.add(f);
                     return true;
                 }
-//                    String[] tokens = line.split("\\s+");
-//                    if (tokens.length < 6)
-//                        continue;
-//                    Double size = safeParseDouble(tokens[tokens.length - 2]);
-//                    if (size == null)
-//                        continue;
-//                    Integer pid = safeParseInteger(tokens[tokens.length - 5]);
-//                    if (pid == null)
-//                        continue;
-//                    String task = "";
-//                    for (int i = 0; i < tokens.length - 5; i++) {
-//                        if (!task.isEmpty())
-//                            task += " ";
-//                        task += tokens[i];
-//                    }
-//                    Proc t = new Proc(task, pid.toString());
-                //out.println(t);
-                //files.add(t);
                 return false;
             }
         });
@@ -243,25 +242,31 @@ public class GitRunner {
             Process p = Runtime.getRuntime().exec(command);
             // read standard output
             input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            StringBuilder outSb = new StringBuilder();
             while ((line = input.readLine()) != null) {
                 if (outClbk == null || !outClbk.parseOutLine(line)) {
                     // just log unhandled lines
                     System.out.println("> " + line); // #debug
+                    outSb.append(line + "\n");
                 }
             }
+            String output = outSb.toString().trim();
+            if (output != null && !output.isEmpty() && outClbk != null && outClbk.invalidateOutput(output)) {
+                throw new IOException(output);
+            }            
             // read error output
             err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            StringBuilder sb = new StringBuilder();
+            StringBuilder errSb = new StringBuilder();
             while ((line = err.readLine()) != null) {
                 //System.err.println(line); // #debug
                 if (outClbk == null || !outClbk.parseErrorLine(line)) {
                     System.out.println("! " + line); // #debug
-                    sb.append(line + "\n");
+                    errSb.append(line + "\n");
                 }
             }
-            String errors = sb.toString().trim();
+            String errors = errSb.toString().trim();
             if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.validateErrors(errors))) {
-                throw new IOException(sb.toString().trim());
+                throw new IOException(errors);
             }
         } finally {
             if (input != null)
@@ -312,14 +317,30 @@ public class GitRunner {
 
     public static abstract class CommandOutputParser {
 
+      /**
+       * @return True if output line was consumed, False otherwise
+       */
         boolean parseOutLine(String line) {
             return false;   // not handled
         }
 
+      /**
+       * @return True if whole output has an actual error, False otherwise
+       */
+        boolean invalidateOutput(String output) {
+            return false;   // not handled
+        }
+
+      /**
+       * @return True if error line has an actual error, False otherwise
+       */
         boolean parseErrorLine(String line) {
             return false;   // not handled
         }
         
+      /**
+       * @return True if whole error output has an actual error, False otherwise
+       */
         boolean validateErrors(String errors) {
             return false;   // not handled
         }
