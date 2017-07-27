@@ -2,9 +2,9 @@ package org.maggus.gpusher;
 
 import javax.imageio.IIOException;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -23,7 +23,65 @@ public class GitRunner {
         return (OS.indexOf("nix") >= 0 || OS.indexOf("nux") >= 0 || OS.indexOf("aix") > 0);
     }
 
-    static String getGitVersion() throws IOException {
+    public static String findSystemPathForExecutable(String exec){
+        StringBuilder sb = new StringBuilder();
+        try {
+            if (isWindows()) {
+                runCommand("where " + exec, new CommandOutputParser() {
+                    @Override
+                    boolean parseOutLine(String line) {
+                        File f = new File(line);
+                        if (f.exists() && f.isFile()) {
+                            sb.append(f.getAbsolutePath().toString());
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+            } else {
+                runCommand("which " + exec, new CommandOutputParser() {
+                    @Override
+                    boolean parseOutLine(String line) {
+                        File f = new File(line);
+                        if (f.exists() && f.isFile()) {
+                            sb.append(f.getAbsolutePath().toString());
+                            return true;
+                        }
+                        return false;
+                    }
+                });
+            }
+        } catch (IOException ex) {
+            // no-op
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    public static String findPathForGitBash(){
+        if(!isWindows())
+            return null;
+        String gPath = findSystemPathForExecutable("git");
+        if(gPath == null)
+            return null;
+        gPath = gPath.toLowerCase();
+        String bPath = null;
+        int p0 = gPath.lastIndexOf("\\git\\cmd\\");
+        if(bPath == null && p0 >= 0){
+            bPath = gPath.substring(0, p0) + "\\git\\bin\\bash.exe";
+        }
+        p0 = gPath.lastIndexOf("\\bin\\");
+        if(bPath == null && p0 >= 0){
+            bPath = gPath.substring(0, p0) + "\\bin\\bash.exe";
+        }
+        if(bPath == null)
+            return null;
+        File f = new File(bPath);
+        if (!f.exists() || !f.isFile())
+            return null;
+        return f.getAbsolutePath().toString();
+    }
+
+    public static String getGitVersion() throws IOException {
         StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
             @Override
@@ -108,7 +166,7 @@ public class GitRunner {
           
             @Override
             boolean validateErrors(String errors) {
-                if(errors.startsWith("From ")){
+                if(errors.startsWith("From ") || errors.contains("* [new tag]") || errors.contains("* [new branch]")){
                     return true;        // it is successful
                 }
                 return false;
@@ -164,15 +222,28 @@ public class GitRunner {
                     return true;
                 } else if (ready && section == 2 && !line.trim().isEmpty()) {
                     // modified files
+                    String file = null;
+                    GitFile.Type type = null;
                     String head = "modified:";
                     int p0 = line.indexOf(head);
-                    String file = line.substring(p0 + head.length()).trim();
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.MODIFIED;
+                    }
+                    head = "deleted:";
+                    p0 = line.indexOf(head);
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.DELETED;
+                    }
+                    if (file == null || type == null)
+                        return false;       // Unsupported parsing!
                     GitFile f = new GitFile(file);
-                    f.type = GitFile.Type.MODIFIED;
+                    f.type = type;
                     files.add(f);
                     return true;
                 } else if (ready && section == 3 && !line.trim().isEmpty()) {
-                    // untracked files
+                    // untracked/ignored files
                     String file = line.trim();
                     GitFile f = new GitFile(file);
                     files.add(f);
@@ -205,7 +276,15 @@ public class GitRunner {
     }
 
     public static void commit(String comment) throws IOException {
-        runCommand("git commit -m \"" + comment + "\"", null);
+        comment = comment.replaceAll("\"", "'");
+        String[] split = comment.split("\\r\\n|\\n|\\r");
+        StringBuilder sb = new StringBuilder();
+        for(String line: split){
+            if(line == null || line.trim().isEmpty())
+                continue;
+            sb.append(" -m \"" + line.trim()+"\"");
+        }
+        runCommand("git commit" + sb.toString(), null);
     }
 
     public static void push(String brName) throws IOException {
@@ -232,7 +311,7 @@ public class GitRunner {
         });
     }
 
-    private static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
+    public static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
         if (validator != null && !validator.preValidateCommand(command))
             return;
         System.out.println("runCommand: " + command); // #debug
@@ -348,7 +427,7 @@ public class GitRunner {
 
     static class GitFile {
         enum Type {
-            NEW, MODIFIED, IGNORED
+            NEW, MODIFIED, DELETED, IGNORED
         }
 
         ;
