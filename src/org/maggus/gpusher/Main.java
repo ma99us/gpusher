@@ -718,6 +718,14 @@ public class Main extends JFrame {
                     }
                     return true;
                 }
+                
+                @Override
+                boolean validateErrors(String errors) {
+                  if (errors.startsWith("warning: ")) {
+                      return true;  // it's ok
+                  }
+                  return false;
+                }
             });
 
             // setup dialog
