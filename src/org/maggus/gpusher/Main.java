@@ -680,6 +680,37 @@ public class Main extends JFrame {
         }
     }
 
+    private JDialog progressDialog;
+    private Thread progressDialogTimer;
+
+    public void showProgressDialog(boolean show) {
+        if (progressDialog == null && show) {
+            // setup dialog
+            //JLabel content = new JLabel(new ImageIcon(Main.class.getResource("progress.png")));
+            JLabel content = new JLabel("Please wait...");
+            JOptionPane optionPane = new JOptionPane(content, JOptionPane.INFORMATION_MESSAGE);
+            optionPane.setOptions(new Object[]{});  // no buttons
+            progressDialog = optionPane.createDialog(this, "Working on it...");
+            //progressDialog.setModal(false);
+            progressDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        }
+        if(show){
+            progressDialogTimer = new Thread(){
+                public void run(){
+                    try {
+                        sleep(500);
+                    } catch (InterruptedException e) { }
+                    if(progressDialog != null)
+                        progressDialog.setVisible(true);        // show dialog
+                }};
+            progressDialogTimer.start();
+        }
+        else{
+            if(progressDialog != null)
+                progressDialog.setVisible(false);        // hide dialog
+        }
+    }
+
     public void showDiffDialog(String file) {
         try {
             JTextPane diffTa = new JTextPane();
@@ -813,7 +844,9 @@ public class Main extends JFrame {
     public void checkoutBranch(String brName) {
         try {
             GitRunner.setCommandValidator(new CommandsLogger());
-            
+
+            showProgressDialog(true);
+
             GitRunner.checkoutBranch(brName, false);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -821,6 +854,7 @@ public class Main extends JFrame {
         } finally {
             GitRunner.setCommandValidator(null);
             updateGitStatus();
+            showProgressDialog(false);
         }
     }
     
@@ -832,7 +866,10 @@ public class Main extends JFrame {
 
             GitRunner.setCommandValidator(new CommandsLogger());
 
-            GitRunner.pull();
+            showProgressDialog(true);
+
+            Thread.currentThread().sleep(5000);         // #TEST
+            //GitRunner.pull();
 
             // done
             long t1 = System.currentTimeMillis();
@@ -845,6 +882,9 @@ public class Main extends JFrame {
             else
                 tsStr = "in " + ts + " seconds.";
             Log.log("Done " + tsStr);
+
+            GitRunner.setCommandValidator(null);
+            updateGitStatus();
         }
         catch(Exception ex){
             ex.printStackTrace();
@@ -852,7 +892,7 @@ public class Main extends JFrame {
         }
         finally {
             GitRunner.setCommandValidator(null);
-            updateGitStatus();
+            showProgressDialog(false);
         }        
     }
     
@@ -863,6 +903,8 @@ public class Main extends JFrame {
             persist();
 
             GitRunner.setCommandValidator(new CommandsLogger());
+
+            showProgressDialog(true);
 
             GitBranch workBranch = config.curBranch;
             if (isCommitAvailable()) {
@@ -920,6 +962,7 @@ public class Main extends JFrame {
         }
         finally {
             GitRunner.setCommandValidator(null);
+            showProgressDialog(false);
         }
     }
 
@@ -979,10 +1022,8 @@ public class Main extends JFrame {
             Document doc = logTa.getStyledDocument();
             //int rowStart = Utilities.getRowStart(logTa, doc.getLength());
             if (doc.getLength() != 0 && !doc.getText(doc.getLength()-2, 2).endsWith("\n"))
-                doc.insertString(doc.getLength(), "\n", null);
+                doc.insertString(doc.getLength(), "\n", atr);
             doc.insertString(doc.getLength(), line, atr);
-//            if(text.endsWith("\n"))
-//                doc.insertString(doc.getLength(), "\n", null);
             logTa.setCaretPosition(doc.getLength());
         } catch (BadLocationException ex) {
             ex.printStackTrace();
