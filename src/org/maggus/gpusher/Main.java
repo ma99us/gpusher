@@ -12,7 +12,10 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -112,7 +115,7 @@ public class Main extends JFrame {
         public JLabel fileCtrl = new JLabel();
         public JButton diffCtrl = new JButton("diff");
 
-        public FileListRow(MyList list, GitFile value) {
+        public FileListRow(final MyList list, final GitFile value) {
             super(false);
 
             setBorder(BorderFactory.createLineBorder(list.getBackground()));
@@ -698,16 +701,20 @@ public class Main extends JFrame {
             progressDialogTimer = new Thread(){
                 public void run(){
                     try {
-                        sleep(500);
-                    } catch (InterruptedException e) { }
-                    if(progressDialog != null)
-                        progressDialog.setVisible(true);        // show dialog
+                        sleep(500); // small pause before showing dialog
+                    } catch (InterruptedException e) {
+                        return; // do not show dialog
+                    }
+                    if(progressDialog != null && !progressDialog.isVisible())
+                        progressDialog.setVisible(true);        // show dialog, this will block thread!
                 }};
             progressDialogTimer.start();
         }
         else{
+            if(progressDialogTimer != null)
+                progressDialogTimer.interrupt();
             if(progressDialog != null)
-                progressDialog.setVisible(false);        // hide dialog
+                progressDialog.setVisible(false);        // hide dialog, unblock thread above
         }
     }
 
@@ -749,10 +756,18 @@ public class Main extends JFrame {
                     }
                     return true;
                 }
+                
+                @Override
+                boolean invalidateErrors(String errors) {
+                  if (errors.startsWith("warning: ")) {
+                      return true;  // it's ok
+                  }
+                  return false;
+                }
             });
 
             // setup dialog
-            JDialog dialog = new JDialog(this);
+            final JDialog dialog = new JDialog(this);
             dialog.setTitle("Diff: " + file);
             dialog.setLayout(new GridBagLayout());
             JScrollPane scrollPane = new JScrollPane(diffTa);
@@ -796,7 +811,7 @@ public class Main extends JFrame {
             for(GitBranch b : branches){
                 branchesModel.addElement(b);
             }
-            JList branchesList = new JList(branchesModel);
+            final JList branchesList = new JList(branchesModel);
             // mark current item
             for (int i = 0; i < branchesModel.getSize(); i++) {
                 GitBranch gf = (GitBranch) branchesModel.get(i);
