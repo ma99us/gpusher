@@ -688,7 +688,7 @@ public class Main extends JFrame {
             diffTa.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
             final StyledDocument doc = diffTa.getStyledDocument();
 
-            GitRunner.runCommand("git diff \"" + file + "\"", new GitRunner.CommandOutputParser() {
+            GitRunner.runCommand("git diff \"" + file + "\"", new GitRunner.GitOutputParser() {
                 @Override
                 boolean parseOutLine(String line) {
                     try {
@@ -718,14 +718,6 @@ public class Main extends JFrame {
                     }
                     return true;
                 }
-                
-                @Override
-                boolean validateErrors(String errors) {
-                  if (errors.startsWith("warning: ")) {
-                      return true;  // it's ok
-                  }
-                  return false;
-                }
             });
 
             // setup dialog
@@ -740,7 +732,7 @@ public class Main extends JFrame {
             gbc.weightx = 1.0; gbc.weighty = 1.0;
             gbc.fill = GridBagConstraints.BOTH;
             dialog.add(scrollPane, gbc);
-            JButton cancelButton = new JButton("Cancel");
+            JButton cancelButton = new JButton("Close");
             cancelButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {

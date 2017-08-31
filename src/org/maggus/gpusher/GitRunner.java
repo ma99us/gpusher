@@ -96,7 +96,7 @@ public class GitRunner {
     public static List<GitBranch> listBranches() throws IOException {
         BufferedReader input = null, err = null;
         List<GitBranch> list = new ArrayList<GitBranch>();
-        runCommand("git branch", new CommandOutputParser() {
+        runCommand("git branch", new GitOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
                 String name = line.trim();
@@ -120,7 +120,7 @@ public class GitRunner {
         //List<GitBranch> list = new ArrayList<GitBranch>();
         GitBranch branch = new GitBranch(brName);
         String command = "git checkout " + (isNew ? "-b " : "") + "\"" + brName + "\"";
-        runCommand(command, new CommandOutputParser() {
+        runCommand(command, new GitOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
                 if (line.startsWith("Already on ")) {
@@ -154,7 +154,7 @@ public class GitRunner {
     }
 
     public static void pull() throws IOException {
-        runCommand("git pull", new CommandOutputParser() {
+        runCommand("git pull", new GitOutputParser() {
           
             @Override
             boolean invalidateOutput(String output) {
@@ -165,7 +165,7 @@ public class GitRunner {
             }
           
             @Override
-            boolean validateErrors(String errors) {
+            boolean invalidateErrors(String errors) {
                 if(errors.startsWith("From ") || errors.contains("* [new tag]") || errors.contains("* [new branch]")){
                     return true;        // it is successful
                 }
@@ -177,7 +177,7 @@ public class GitRunner {
     public static List<GitFile> listChangedFiles() throws IOException {
         BufferedReader input = null, err = null;
         List<GitFile> files = new ArrayList<GitFile>();
-        runCommand("git status", new CommandOutputParser() {
+        runCommand("git status", new GitOutputParser() {
             int section = 0;
             boolean ready = false;
 
@@ -198,7 +198,7 @@ public class GitRunner {
                 }
 
                 if (ready && section == 1 && !line.trim().isEmpty()) {
-                    // new/added files
+                    // already staged new/added/modified files
                     String file = null;
                     GitFile.Type type = null;
                     String head = "new file:";
@@ -213,6 +213,12 @@ public class GitRunner {
                         file = line.substring(p0 + head.length()).trim();
                         type = GitFile.Type.MODIFIED;
                     }
+                    head = "deleted:";
+                    p0 = line.indexOf(head);
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.DELETED;
+                    }
                     if (file == null || type == null)
                         return false;       // Unsupported parsing!
                     GitFile f = new GitFile(file);
@@ -221,11 +227,17 @@ public class GitRunner {
                     files.add(f);
                     return true;
                 } else if (ready && section == 2 && !line.trim().isEmpty()) {
-                    // modified files
+                    // not staged modified files
                     String file = null;
                     GitFile.Type type = null;
-                    String head = "modified:";
+                    String head = "new file:";
                     int p0 = line.indexOf(head);
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.NEW;
+                    }                    
+                    head = "modified:";
+                    p0 = line.indexOf(head);
                     if (p0 >= 0) {
                         file = line.substring(p0 + head.length()).trim();
                         type = GitFile.Type.MODIFIED;
@@ -288,7 +300,7 @@ public class GitRunner {
     }
 
     public static void push(String brName) throws IOException {
-        runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
+        runCommand("git push -u origin \"" + brName + "\"", new GitOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
                 if (line.startsWith("Branch " + brName + " set up to track remote branch ")) {
@@ -299,7 +311,7 @@ public class GitRunner {
             }
 
             @Override
-            boolean validateErrors(String errors) {
+            boolean invalidateErrors(String errors) {
                 if(errors.contains(brName + " -> " + brName)){
                     return true;        // it is successful
                 }
@@ -344,7 +356,7 @@ public class GitRunner {
                 }
             }
             String errors = errSb.toString().trim();
-            if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.validateErrors(errors))) {
+            if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.invalidateErrors(errors))) {
                 throw new IOException(errors);
             }
         } finally {
@@ -394,6 +406,18 @@ public class GitRunner {
         }
     }
 
+    public static abstract class GitOutputParser extends CommandOutputParser {
+
+        @Override
+        boolean invalidateErrors(String errors) {
+            if(errors != null && errors.contains("warning:") && !errors.contains("error:")){
+                Log.log(Log.Level.warn, errors);
+                return true;  // probably not an error
+            }
+            return super.invalidateErrors(errors);   // default
+        }
+    }
+
     public static abstract class CommandOutputParser {
 
       /**
@@ -418,9 +442,9 @@ public class GitRunner {
         }
         
       /**
-       * @return True if whole error output has an actual error, False otherwise
+       * @return True if whole error output does NOT have an actual error, False otherwise
        */
-        boolean validateErrors(String errors) {
+        boolean invalidateErrors(String errors) {
             return false;   // not handled
         }
     }
