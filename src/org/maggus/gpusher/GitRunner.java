@@ -155,7 +155,7 @@ public class GitRunner {
 
     public static void pull() throws IOException {
         runCommand("git pull", new CommandOutputParser() {
-          
+
             @Override
             boolean invalidateOutput(String output) {
                 if(output.startsWith("error: ")){
@@ -163,7 +163,7 @@ public class GitRunner {
                 }
                 return false;
             }
-          
+
             @Override
             boolean invalidateErrors(String errors) {
                 if(errors.startsWith("From ") || errors.contains("* [new tag]") || errors.contains("* [new branch]")){
@@ -338,7 +338,7 @@ public class GitRunner {
             String output = outSb.toString().trim();
             if (output != null && !output.isEmpty() && outClbk != null && outClbk.invalidateOutput(output)) {
                 throw new IOException(output);
-            }            
+            }
             // read error output
             err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
             StringBuilder errSb = new StringBuilder();

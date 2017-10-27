@@ -756,7 +756,7 @@ public class Main extends JFrame {
                     }
                     return true;
                 }
-                
+
                 @Override
                 boolean invalidateErrors(String errors) {
                   if (errors.startsWith("warning: ")) {
