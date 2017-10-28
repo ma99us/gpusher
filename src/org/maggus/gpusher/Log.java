@@ -32,8 +32,6 @@ public class Log {
 
     public static enum Level {info, warn, err}
 
-    ;
-
     public static interface LogListener {
         void onLog(Level lvl, String message);
     }

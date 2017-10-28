@@ -24,7 +24,7 @@ public class GitRunner {
     }
 
     public static String findSystemPathForExecutable(String exec){
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         try {
             if (isWindows()) {
                 runCommand("where " + exec, new CommandOutputParser() {
@@ -82,7 +82,7 @@ public class GitRunner {
     }
 
     public static String getGitVersion() throws IOException {
-        StringBuilder sb = new StringBuilder();
+        final StringBuilder sb = new StringBuilder();
         runCommand("git --version", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
@@ -95,7 +95,7 @@ public class GitRunner {
 
     public static List<GitBranch> listBranches() throws IOException {
         BufferedReader input = null, err = null;
-        List<GitBranch> list = new ArrayList<GitBranch>();
+        final List<GitBranch> list = new ArrayList<GitBranch>();
         runCommand("git branch", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
@@ -118,7 +118,7 @@ public class GitRunner {
     public static GitBranch checkoutBranch(String brName, boolean isNew) throws IOException {
         BufferedReader input = null, err = null;
         //List<GitBranch> list = new ArrayList<GitBranch>();
-        GitBranch branch = new GitBranch(brName);
+        final GitBranch branch = new GitBranch(brName);
         String command = "git checkout " + (isNew ? "-b " : "") + "\"" + brName + "\"";
         runCommand(command, new CommandOutputParser() {
             @Override
@@ -154,11 +154,20 @@ public class GitRunner {
     }
 
     public static void pull() throws IOException {
-        runCommand("git pull", new CommandOutputParser(){
+        runCommand("git pull", new CommandOutputParser() {
+
             @Override
-            boolean validateErrors(String errors) {
-                if(errors.contains("* [new tag]") || errors.contains("* [new branch]")){
-                    return true;     // it is successful
+            boolean invalidateOutput(String output) {
+                if(output.startsWith("error: ")){
+                    return true;        // it is unsuccessful
+                }
+                return false;
+            }
+
+            @Override
+            boolean invalidateErrors(String errors) {
+                if(errors.startsWith("From ") || errors.contains("* [new tag]") || errors.contains("* [new branch]")){
+                    return true;        // it is successful
                 }
                 return false;
             }
@@ -167,7 +176,7 @@ public class GitRunner {
         
     public static List<GitFile> listChangedFiles() throws IOException {
         BufferedReader input = null, err = null;
-        List<GitFile> files = new ArrayList<GitFile>();
+        final List<GitFile> files = new ArrayList<GitFile>();
         runCommand("git status", new CommandOutputParser() {
             int section = 0;
             boolean ready = false;
@@ -189,7 +198,7 @@ public class GitRunner {
                 }
 
                 if (ready && section == 1 && !line.trim().isEmpty()) {
-                    // new/added files
+                    // already staged changes
                     String file = null;
                     GitFile.Type type = null;
                     String head = "new file:";
@@ -204,6 +213,12 @@ public class GitRunner {
                         file = line.substring(p0 + head.length()).trim();
                         type = GitFile.Type.MODIFIED;
                     }
+                    head = "deleted:";
+                    p0 = line.indexOf(head);
+                    if (p0 >= 0) {
+                        file = line.substring(p0 + head.length()).trim();
+                        type = GitFile.Type.DELETED;
+                    }
                     if (file == null || type == null)
                         return false;       // Unsupported parsing!
                     GitFile f = new GitFile(file);
@@ -212,7 +227,7 @@ public class GitRunner {
                     files.add(f);
                     return true;
                 } else if (ready && section == 2 && !line.trim().isEmpty()) {
-                    // modified files
+                    // not staged changes
                     String file = null;
                     GitFile.Type type = null;
                     String head = "modified:";
@@ -247,7 +262,17 @@ public class GitRunner {
     }
 
     public static void addFile(String path) throws IOException {
-        runCommand("git add \"" + path + "\"", null);
+        runCommand("git add \"" + path + "\"", new CommandOutputParser() {
+
+// TODO: un-comment this to disable fail on warnings
+//            @Override
+//            boolean invalidateErrors(String errors) {
+//                if(errors.startsWith("warning: ")){
+//                    return true;        // it is successful
+//                }
+//                return false;
+//            }
+        });
     }
 
     public static void addFiles(List<GitFile> files) throws IOException {
@@ -278,7 +303,7 @@ public class GitRunner {
         runCommand("git commit" + sb.toString(), null);
     }
 
-    public static void push(String brName) throws IOException {
+    public static void push(final String brName) throws IOException {
         runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
@@ -290,8 +315,8 @@ public class GitRunner {
             }
 
             @Override
-            boolean validateErrors(String errors) {
-                if(errors.contains(brName + " -> " + brName)){
+            boolean invalidateErrors(String errors) {
+                if(errors.contains(brName + " -> ")){
                     return true;        // it is successful
                 }
                 else if(errors.contains("Everything up-to-date")){
@@ -300,6 +325,15 @@ public class GitRunner {
                 return false;
             }
         });
+    }
+
+    public static void revertFile(String path) throws IOException {
+        runCommand("git checkout -- \"" + path + "\"", null);
+    }
+
+    public static void deleteFile(String path) throws IOException {
+        File file = new File(path);
+        file.delete();
     }
 
     public static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
@@ -312,25 +346,31 @@ public class GitRunner {
             Process p = Runtime.getRuntime().exec(command);
             // read standard output
             input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            StringBuilder outSb = new StringBuilder();
             while ((line = input.readLine()) != null) {
                 if (outClbk == null || !outClbk.parseOutLine(line)) {
                     // just log unhandled lines
                     System.out.println("> " + line); // #debug
+                    outSb.append(line + "\n");
                 }
+            }
+            String output = outSb.toString().trim();
+            if (output != null && !output.isEmpty() && outClbk != null && outClbk.invalidateOutput(output)) {
+                throw new IOException(output);
             }
             // read error output
             err = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            StringBuilder sb = new StringBuilder();
+            StringBuilder errSb = new StringBuilder();
             while ((line = err.readLine()) != null) {
                 //System.err.println(line); // #debug
                 if (outClbk == null || !outClbk.parseErrorLine(line)) {
                     System.out.println("! " + line); // #debug
-                    sb.append(line + "\n");
+                    errSb.append(line + "\n");
                 }
             }
-            String errors = sb.toString().trim();
-            if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.validateErrors(errors))) {
-                throw new IOException(sb.toString().trim());
+            String errors = errSb.toString().trim();
+            if (errors != null && !errors.isEmpty() && (outClbk == null || !outClbk.invalidateErrors(errors))) {
+                throw new IOException(errors);
             }
         } finally {
             if (input != null)
@@ -379,17 +419,39 @@ public class GitRunner {
         }
     }
 
+    public static abstract class GitOutputParser extends CommandOutputParser{
+        boolean invalidateErrors(String errors) {
+            return false;   // not handled
+        }
+    }
+
     public static abstract class CommandOutputParser {
 
+      /**
+       * @return True if output line was consumed, False otherwise
+       */
         boolean parseOutLine(String line) {
             return false;   // not handled
         }
 
+      /**
+       * @return True if whole output has an actual error, False otherwise
+       */
+        boolean invalidateOutput(String output) {
+            return false;   // not handled
+        }
+
+      /**
+       * @return True if error line has an actual error, False otherwise
+       */
         boolean parseErrorLine(String line) {
             return false;   // not handled
         }
         
-        boolean validateErrors(String errors) {
+      /**
+       * @return True if whole error is NOT an actual error, False otherwise
+       */
+        boolean invalidateErrors(String errors) {
             return false;   // not handled
         }
     }
