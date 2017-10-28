@@ -624,12 +624,12 @@ public class Main extends JFrame {
     private boolean isCommitAvailable() {
         return ((config.filesToAdd != null && !config.filesToAdd.isEmpty()) // there are files to add
                 || (config.filesToReset != null && !config.filesToReset.isEmpty())  // there are files to reset
-                || (config.curBranch != null && config.curBranch.type == GitBranch.Type.AHEAD));    // files already added, but not committed
+                || (!changesList.getSelectedValuesList().isEmpty()));   // files already added, but not committed
     }
 
     private boolean isPushAvailable() {
-        return ((isCommitAvailable() && config.pushAfterCommit != null && config.pushAfterCommit)
-                || (!isCommitAvailable() && config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));
+        return ((isCommitAvailable() && config.pushAfterCommit != null && config.pushAfterCommit)   //
+                || (!isCommitAvailable() && config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));    // no changes to commit, and previous local commits were not pushed yet
     }
 
 
