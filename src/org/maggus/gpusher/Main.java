@@ -312,7 +312,7 @@ public class Main extends JFrame {
                     revertFile(value.path);
                 }
                 else if(e.getActionCommand() == ItemPopupMenu.DELETE_ACTION && value != null){
-                    int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to delete " + value.path + " ?", "Warning", JOptionPane.YES_NO_OPTION);
+                    int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to delete \"" + value.path + "\" ?", "Warning", JOptionPane.YES_NO_OPTION);
                     if (dialogResult == JOptionPane.YES_OPTION) {
                         deleteFile(value.path);
                     }

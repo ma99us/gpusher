@@ -262,7 +262,17 @@ public class GitRunner {
     }
 
     public static void addFile(String path) throws IOException {
-        runCommand("git add \"" + path + "\"", null);
+        runCommand("git add \"" + path + "\"", new CommandOutputParser() {
+
+// TODO: un-comment this to disable fail on warnings
+//            @Override
+//            boolean invalidateErrors(String errors) {
+//                if(errors.startsWith("warning: ")){
+//                    return true;        // it is successful
+//                }
+//                return false;
+//            }
+        });
     }
 
     public static void addFiles(List<GitFile> files) throws IOException {
@@ -322,7 +332,8 @@ public class GitRunner {
     }
 
     public static void deleteFile(String path) throws IOException {
-        runCommand("git rm \"" + path + "\"", null);
+        File file = new File(path);
+        file.delete();
     }
 
     public static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
