@@ -317,6 +317,14 @@ public class GitRunner {
         });
     }
 
+    public static void revertFile(String path) throws IOException {
+        runCommand("git checkout -- \"" + path + "\"", null);
+    }
+
+    public static void deleteFile(String path) throws IOException {
+        runCommand("git rm \"" + path + "\"", null);
+    }
+
     public static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
         if (validator != null && !validator.preValidateCommand(command))
             return;

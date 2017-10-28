@@ -3,6 +3,7 @@ package org.maggus.gpusher;
 import org.maggus.gpusher.GitRunner.GitBranch;
 import org.maggus.gpusher.GitRunner.GitFile;
 import org.maggus.gpusher.Log.LogListener;
+import org.maggus.widgets.GUIUtils;
 import org.maggus.widgets.MyList;
 
 import javax.swing.*;
@@ -85,7 +86,7 @@ public class Main extends JFrame {
             return true;
         }
     }
-    
+
     class FilesListSelectionModel extends DefaultListSelectionModel {
         private static final long serialVersionUID = 1L;
         boolean gestureStarted = false;
@@ -235,7 +236,7 @@ public class Main extends JFrame {
                 pull();
             }
         });
-        
+
         changesList = new MyList();
         changesList.setModel(new DefaultListModel<GitFile>());
         changesList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -299,6 +300,25 @@ public class Main extends JFrame {
                 updateGUI();
             }
         });
+        changesList.setComponentPopupMenu(new ItemPopupMenu(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                ItemPopupMenu menu = (ItemPopupMenu) ((JMenuItem) e.getSource()).getParent();
+                GitFile value = (GitFile)changesList.getModel().get(menu.getListItemIndex());
+                if(e.getActionCommand() == ItemPopupMenu.DIFF_ACTION && value != null){
+                    showDiffDialog(value.path);
+                }
+                else if(e.getActionCommand() == ItemPopupMenu.REVERT_ACTION && value != null){
+                    revertFile(value.path);
+                }
+                else if(e.getActionCommand() == ItemPopupMenu.DELETE_ACTION && value != null){
+                    int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to delete " + value.path + " ?", "Warning", JOptionPane.YES_NO_OPTION);
+                    if (dialogResult == JOptionPane.YES_OPTION) {
+                        deleteFile(value.path);
+                    }
+                }
+            }
+        }));
 
         selectedLbl = new JLabel("Selected files: <none>");
 
@@ -778,7 +798,7 @@ public class Main extends JFrame {
             gbc.weightx = 1.0; gbc.weighty = 1.0;
             gbc.fill = GridBagConstraints.BOTH;
             dialog.add(scrollPane, gbc);
-            JButton cancelButton = new JButton("Cancel");
+            JButton cancelButton = new JButton("Close");
             cancelButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -789,6 +809,7 @@ public class Main extends JFrame {
             gbc.weightx = 0.0; gbc.weighty = 0.0;
             gbc.fill = GridBagConstraints.NONE;
             dialog.add(cancelButton, gbc);
+            GUIUtils.installEscapeCloseOperation(dialog);
             dialog.pack();
             Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
             int width  = Math.min(dialog.getSize().width, (int)(screenSize.width * 0.8));
@@ -848,6 +869,7 @@ public class Main extends JFrame {
                     dialog.setVisible(false);
                 }
             });
+            GUIUtils.installEscapeCloseOperation(dialog);
             dialog.setVisible(true);        // show dialog
         }
         catch(Exception ex){
@@ -872,7 +894,7 @@ public class Main extends JFrame {
             showProgressDialog(false);
         }
     }
-    
+
     public void pull(){
         try{
             long t0 = System.currentTimeMillis();
@@ -908,9 +930,9 @@ public class Main extends JFrame {
         finally {
             GitRunner.setCommandValidator(null);
             showProgressDialog(false);
-        }        
+        }
     }
-    
+
     public void commit(){
         try{
             long t0 = System.currentTimeMillis();
@@ -980,6 +1002,41 @@ public class Main extends JFrame {
             showProgressDialog(false);
         }
     }
+
+    public void revertFile(String fName) {
+        try {
+            GitRunner.setCommandValidator(new CommandsLogger());
+
+            showProgressDialog(true);
+
+            GitRunner.revertFile(fName);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
+        } finally {
+            GitRunner.setCommandValidator(null);
+            updateGitStatus();
+            showProgressDialog(false);
+        }
+    }
+
+    public void deleteFile(String fName) {
+        try {
+            GitRunner.setCommandValidator(new CommandsLogger());
+
+            showProgressDialog(true);
+
+            GitRunner.deleteFile(fName);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            Log.log(Log.Level.err, ex.getMessage());
+        } finally {
+            GitRunner.setCommandValidator(null);
+            updateGitStatus();
+            showProgressDialog(false);
+        }
+    }
+
 
     public void openShell(){
         try{

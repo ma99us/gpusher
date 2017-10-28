@@ -54,8 +54,21 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 				if(component != null) {
 					int idx = findComponentIndex(component);
                     // select list row under the mouse
-					if(idx >= 0)
+					if(idx >= 0 && e.getButton() == 1) {
+						// select only on left button click
 						setSelectionInterval(idx, idx);
+					}
+					//else if(idx >= 0 && e.isPopupTrigger()){	//FIXME: isPopupTrigger does nto work in mouse pressed
+					else if(idx >= 0 && e.getButton() == 3){
+						// show context menu on right button click
+						JPopupMenu popMenu = MyList.this.getComponentPopupMenu();
+						if(popMenu != null){
+							if(popMenu instanceof MyPopupMenu){
+								((MyPopupMenu)popMenu).setListItemIndex(idx);
+							}
+							popMenu.show(e.getComponent(), e.getX(), e.getY());
+						}
+					}
 				}
 			}
 		});
