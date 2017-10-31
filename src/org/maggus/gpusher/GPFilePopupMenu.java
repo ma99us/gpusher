@@ -6,13 +6,13 @@ import org.maggus.widgets.MyPopupMenu;
 import javax.swing.*;
 import java.awt.event.ActionListener;
 
-public class ItemPopupMenu extends MyPopupMenu {
+public class GPFilePopupMenu extends MyPopupMenu {
     public static final String DIFF_ACTION = "Diff changes";
     public static final String REVERT_ACTION = "Revert changes";
     public static final String DELETE_ACTION = "Delete file";
     private final MyList list;
 
-    public ItemPopupMenu(MyList list, ActionListener listener) {
+    public GPFilePopupMenu(MyList list, ActionListener listener) {
         this.list = list;
 
         add(DIFF_ACTION).addActionListener(listener);
