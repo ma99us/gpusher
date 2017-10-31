@@ -26,6 +26,8 @@ import java.util.Properties;
  */
 public class Main extends JFrame {
 
+    public static final String APP_VER = "2017.10.31";
+
     class AppConfig extends Config {
         // TODO: maybe do not store some settings globally
         String curWorkingDir;
@@ -300,16 +302,19 @@ public class Main extends JFrame {
                 updateGUI();
             }
         });
-        changesList.setComponentPopupMenu(new ItemPopupMenu(new ActionListener() {
+        changesList.setComponentPopupMenu(new GPFilePopupMenu(changesList, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                ItemPopupMenu menu = (ItemPopupMenu) ((JMenuItem) e.getSource()).getParent();
+                GPFilePopupMenu menu = (GPFilePopupMenu) ((JMenuItem) e.getSource()).getParent();
                 GitFile value = (GitFile) changesList.getModel().get(menu.getListItemIndex());
-                if (e.getActionCommand() == ItemPopupMenu.DIFF_ACTION && value != null) {
+                if (e.getActionCommand() == GPFilePopupMenu.DIFF_ACTION && value != null) {
                     showDiffDialog(value.path);
-                } else if (e.getActionCommand() == ItemPopupMenu.REVERT_ACTION && value != null) {
-                    revertFile(value.path);
-                } else if (e.getActionCommand() == ItemPopupMenu.DELETE_ACTION && value != null) {
+                } else if (e.getActionCommand() == GPFilePopupMenu.REVERT_ACTION && value != null) {
+                    int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to lose all uncommitted changes in \"" + value.path + "\" ?", "Warning", JOptionPane.YES_NO_OPTION);
+                    if (dialogResult == JOptionPane.YES_OPTION) {
+                        revertFile(value.path);
+                    }
+                } else if (e.getActionCommand() == GPFilePopupMenu.DELETE_ACTION && value != null) {
                     int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to delete \"" + value.path + "\" ?", "Warning", JOptionPane.YES_NO_OPTION);
                     if (dialogResult == JOptionPane.YES_OPTION) {
                         deleteFile(value.path);
@@ -574,7 +579,7 @@ public class Main extends JFrame {
 
     private void showAboutDialog() {
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v.2017.10.28", JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v." + APP_VER, JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -644,7 +649,7 @@ public class Main extends JFrame {
     }
 
     public void updateGitStatus() {
-        new GWorker(this) {
+        new GPWorker(this) {
             boolean updated = false;
 
             @Override
@@ -878,7 +883,7 @@ public class Main extends JFrame {
     }
 
     public void checkoutBranch(String brName) {
-        new GWorker(this) {
+        new GPWorker(this) {
             @Override
             protected void doInBackground() throws Exception {
                 GitRunner.checkoutBranch(brName, false);
@@ -893,7 +898,7 @@ public class Main extends JFrame {
     }
 
     public void pull() {
-        new GWorker(this) {
+        new GPWorker(this) {
             @Override
             protected void prepare() {
                 super.prepare();
@@ -916,7 +921,7 @@ public class Main extends JFrame {
     }
 
     public void commit() {
-        new GWorker(this) {
+        new GPWorker(this) {
             @Override
             protected void prepare() {
                 super.prepare();
@@ -972,7 +977,7 @@ public class Main extends JFrame {
     }
 
     public void revertFile(String fName) {
-        new GWorker(this) {
+        new GPWorker(this) {
             @Override
             protected void doInBackground() throws Exception {
                 GitRunner.revertFile(fName);
@@ -987,7 +992,7 @@ public class Main extends JFrame {
     }
 
     public void deleteFile(String fName) {
-        new GWorker(this) {
+        new GPWorker(this) {
             @Override
             protected void doInBackground() throws Exception {
                 GitRunner.deleteFile(fName);

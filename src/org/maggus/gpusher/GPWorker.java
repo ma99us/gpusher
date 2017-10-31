@@ -2,12 +2,12 @@ package org.maggus.gpusher;
 
 import javax.swing.*;
 
-public abstract class GWorker {
+public abstract class GPWorker {
     private final SwingWorker worker;
     private final Main main;
     private long t0;
 
-    GWorker(Main main) {
+    GPWorker(Main main) {
         this.main = main;
         worker = new SwingWorker<Void, Void>() {
             private Exception ex;
@@ -16,7 +16,7 @@ public abstract class GWorker {
             protected Void doInBackground() {
                 ex = null;
                 try {
-                    GWorker.this.doInBackground();
+                    GPWorker.this.doInBackground();
                 } catch (Exception ex) {
                     this.ex = ex;
                 }
@@ -25,7 +25,7 @@ public abstract class GWorker {
 
             @Override
             protected void done() {
-                GWorker.this.done(ex);
+                GPWorker.this.done(ex);
             }
         };
     }

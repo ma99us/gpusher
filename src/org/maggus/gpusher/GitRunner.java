@@ -315,6 +315,14 @@ public class GitRunner {
             }
 
             @Override
+            boolean invalidateOutput(String output) {
+                if(output.contains("[rejected]")){
+                    return true;        // it is NOT successful
+                }
+                return false;
+            }
+
+            @Override
             boolean invalidateErrors(String errors) {
                 if(errors.contains(brName + " -> ")){
                     return true;        // it is successful

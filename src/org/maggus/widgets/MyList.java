@@ -1,15 +1,17 @@
 package org.maggus.widgets;
 
-import java.awt.*;
-import java.awt.event.*;
-import java.util.*;
-
 import javax.swing.*;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 
 public class MyList<E> extends JPanel implements ListDataListener, ListSelectionListener {
 
@@ -63,10 +65,14 @@ public class MyList<E> extends JPanel implements ListDataListener, ListSelection
 						// show context menu on right button click
 						JPopupMenu popMenu = MyList.this.getComponentPopupMenu();
 						if(popMenu != null){
+							boolean doShow = true;
 							if(popMenu instanceof MyPopupMenu){
 								((MyPopupMenu)popMenu).setListItemIndex(idx);
+								doShow = ((MyPopupMenu)popMenu).validateMenu(idx);
 							}
-							popMenu.show(e.getComponent(), e.getX(), e.getY());
+							if(doShow){
+								popMenu.show(e.getComponent(), e.getX(), e.getY());
+							}
 						}
 					}
 				}
