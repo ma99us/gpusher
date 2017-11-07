@@ -13,10 +13,9 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.text.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -41,6 +40,7 @@ public class Main extends JFrame {
         String branchPrefix;
         Boolean backToOriginalBranch;
         Boolean pushAfterCommit;
+        Rectangle windowSize;
 
         public AppConfig() {
             super("gpshr", false);  // store setting in workign dir
@@ -54,6 +54,14 @@ public class Main extends JFrame {
             branchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
             backToOriginalBranch = parseBoolean(props.getProperty("BACK_TO_ORIGINAL_BRANCH"));
             pushAfterCommit = parseBoolean(props.getProperty("PUSH_AFTER_COMMIT"));
+            // load window state
+            Integer windowX = parseInteger(props.getProperty("WINDOW_X"));
+            Integer windowY = parseInteger(props.getProperty("WINDOW_Y"));
+            Integer windowWidth = parseInteger(props.getProperty("WINDOW_WIDTH"));
+            Integer windowHeight = parseInteger(props.getProperty("WINDOW_HEIGHT"));
+            if(windowX != null && windowY != null && windowWidth != null && windowHeight != null){
+                windowSize = new Rectangle(windowX, windowY, windowWidth, windowHeight);
+            }
 
             // init controls
             if (commitMessage != null)
@@ -77,6 +85,13 @@ public class Main extends JFrame {
             saveValue(props, "NEW_BRANCH_PREFIX", branchPrefix);
             saveValue(props, "BACK_TO_ORIGINAL_BRANCH", backToOriginalBranch);
             saveValue(props, "PUSH_AFTER_COMMIT", pushAfterCommit);
+            // save window state
+            if(windowSize != null){
+                saveValue(props, "WINDOW_X", (int)windowSize.getLocation().getX());
+                saveValue(props, "WINDOW_Y", (int)windowSize.getLocation().getY());
+                saveValue(props, "WINDOW_WIDTH", (int)windowSize.getSize().getWidth());
+                saveValue(props, "WINDOW_HEIGHT", (int)windowSize.getSize().getHeight());
+            }
         }
     }
 
@@ -573,8 +588,6 @@ public class Main extends JFrame {
         JScrollPane scrollPane = new JScrollPane(logTa);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         contentPane.add(scrollPane, gbc);
-
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
     private void showAboutDialog() {
@@ -583,8 +596,8 @@ public class Main extends JFrame {
     }
 
     public void persist() {
-        config.saveConfig();
         // TODO: 2017-06-14 store current state to preferences file
+        config.saveConfig();
     }
 
     public void updateNewBrunchName() {
@@ -717,9 +730,18 @@ public class Main extends JFrame {
             //JLabel content = new JLabel(new ImageIcon(Main.class.getResource("progress.png")));
             JLabel content = new JLabel("Please wait...");
             JOptionPane optionPane = new JOptionPane(content, JOptionPane.INFORMATION_MESSAGE);
+            optionPane.addPropertyChangeListener(new PropertyChangeListener() {
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    String name = evt.getPropertyName();
+                    if ("value".equals(name)) {
+                        progressDialog.dispose();
+                    }
+                }
+            });
             optionPane.setOptions(new Object[]{});  // no buttons
             progressDialog = optionPane.createDialog(this, "Working on it...");
-            //progressDialog.setModal(false);
+            progressDialog.pack();
             progressDialog.setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         }
         if (show) {
@@ -730,8 +752,10 @@ public class Main extends JFrame {
                     } catch (InterruptedException e) {
                         return; // do not show dialog
                     }
-                    if (progressDialog != null && !progressDialog.isVisible())
+                    if (progressDialog != null && !progressDialog.isVisible()) {
+                        progressDialog.setLocationRelativeTo(Main.this);
                         progressDialog.setVisible(true);        // show dialog, this will block thread!
+                    }
                 }
             };
             progressDialogTimer.start();
@@ -1077,6 +1101,11 @@ public class Main extends JFrame {
                 throw new IllegalArgumentException("Running on unsupported OS");
             }
 
+//            try {
+//                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+//            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+//            }
+
             final Main gui = new Main();      // create GUI
             Log.setLogListener(new LogListener() {
                 @Override
@@ -1090,9 +1119,28 @@ public class Main extends JFrame {
             gui.updateGitStatus();
 
             // show GUI
-            gui.setPreferredSize(new Dimension(600, 600));
+            if (gui.config.windowSize != null) {
+                gui.setPreferredSize(gui.config.windowSize.getSize());
+            } else {
+                gui.setPreferredSize(new Dimension(600, 600));
+            }
             gui.pack();
-            gui.setLocationRelativeTo(null);
+            if (gui.config.windowSize != null) {
+                gui.setLocation(gui.config.windowSize.getLocation());
+            }
+            else{
+                gui.setLocationRelativeTo(null);
+            }
+            //gui.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            gui.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+            gui.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    gui.config.windowSize = new Rectangle(gui.getLocation(), gui.getSize());
+                    gui.persist();
+                    System.exit(0);
+                }
+            });
             gui.setVisible(true);
 
             // start refresh timer
