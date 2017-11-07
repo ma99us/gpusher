@@ -25,10 +25,12 @@ import java.util.Properties;
  */
 public class Main extends JFrame {
 
-    public static final String APP_VER = "2017.10.31";
+    public static final String APP_NAME = "G-Pusher";
+    public static final String APP_VER = "2017.11.07";
 
-    class AppConfig extends Config {
+    class Config extends MyConfig {
         // TODO: maybe do not store some settings globally
+        String projectName;
         String curWorkingDir;
         List<GitBranch> gitBranches;
         List<GitFile> gitFiles;
@@ -42,9 +44,9 @@ public class Main extends JFrame {
         Boolean pushAfterCommit;
         Rectangle windowSize;
 
-        public AppConfig() {
+        public Config() {
             super("gpshr", false);  // store setting in workign dir
-            configComment = "This is a G-Pusher configuration file";
+            configComment = "This is a "+APP_NAME+" configuration file";
         }
 
         @Override
@@ -172,7 +174,7 @@ public class Main extends JFrame {
         }
     }
 
-    AppConfig config = new AppConfig();
+    Config config = new Config();
     volatile boolean dataDone;
 
     JButton refreshBtn;
@@ -194,7 +196,7 @@ public class Main extends JFrame {
     JButton commitBtn;
 
     public Main() throws HeadlessException {
-        super("G-Pusher");
+        super(APP_NAME);
 
         SwingUtilities.updateComponentTreeUI(this);
 
@@ -317,19 +319,19 @@ public class Main extends JFrame {
                 updateGUI();
             }
         });
-        changesList.setComponentPopupMenu(new GPFilePopupMenu(changesList, new ActionListener() {
+        changesList.setComponentPopupMenu(new FilePopupMenu(changesList, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                GPFilePopupMenu menu = (GPFilePopupMenu) ((JMenuItem) e.getSource()).getParent();
+                FilePopupMenu menu = (FilePopupMenu) ((JMenuItem) e.getSource()).getParent();
                 GitFile value = (GitFile) changesList.getModel().get(menu.getListItemIndex());
-                if (e.getActionCommand() == GPFilePopupMenu.DIFF_ACTION && value != null) {
+                if (e.getActionCommand() == FilePopupMenu.DIFF_ACTION && value != null) {
                     showDiffDialog(value.path);
-                } else if (e.getActionCommand() == GPFilePopupMenu.REVERT_ACTION && value != null) {
+                } else if (e.getActionCommand() == FilePopupMenu.REVERT_ACTION && value != null) {
                     int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to lose all uncommitted changes in \"" + value.path + "\" ?", "Warning", JOptionPane.YES_NO_OPTION);
                     if (dialogResult == JOptionPane.YES_OPTION) {
                         revertFile(value.path);
                     }
-                } else if (e.getActionCommand() == GPFilePopupMenu.DELETE_ACTION && value != null) {
+                } else if (e.getActionCommand() == FilePopupMenu.DELETE_ACTION && value != null) {
                     int dialogResult = JOptionPane.showConfirmDialog(Main.this, "Are you sure you want to delete \"" + value.path + "\" ?", "Warning", JOptionPane.YES_NO_OPTION);
                     if (dialogResult == JOptionPane.YES_OPTION) {
                         deleteFile(value.path);
@@ -489,7 +491,7 @@ public class Main extends JFrame {
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
-        contentPane.add(new JLabel("Select files to commit:"), gbc);
+        contentPane.add(new JLabel("Select changes to commit:"), gbc);
 
         gbc.gridwidth = 5;
         gbc.gridx = 0;
@@ -592,7 +594,7 @@ public class Main extends JFrame {
 
     private void showAboutDialog() {
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(this, picLabel, "GIT Pusher tool by Mike Gerdov v." + APP_VER, JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(this, picLabel, APP_NAME + " - GIT tool by Mike Gerdov v." + APP_VER, JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -610,6 +612,9 @@ public class Main extends JFrame {
     }
 
     public void updateGUI() {
+        if(config.projectName != null){
+            setTitle(APP_NAME + " - " + config.projectName);
+        }
         if (config.curWorkingDir != null) {
             curWorkingDirTxt.setText(config.curWorkingDir);
         }
@@ -624,7 +629,7 @@ public class Main extends JFrame {
             filesLbls.add("Files to Add: " + config.filesToAdd.size());
         if (config.filesToReset != null && !config.filesToReset.isEmpty())
             filesLbls.add("Files to Reset: " + config.filesToReset.size());
-        selectedLbl.setText(Config.listToString(filesLbls, "nothing selected"));
+        selectedLbl.setText(MyConfig.listToString(filesLbls, "No files selected"));
         branchPrefixTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         newBranchTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
@@ -636,7 +641,7 @@ public class Main extends JFrame {
             commitLbls.add("Commit");
         if (isPushAvailable())
             commitLbls.add("Push");
-        commitBtn.setText(Config.listToString(commitLbls, "nothing to do"));
+        commitBtn.setText(MyConfig.listToString(commitLbls, "Nothing to do"));
     }
 
     private boolean isCommitAvailable() {
@@ -662,7 +667,7 @@ public class Main extends JFrame {
     }
 
     public void updateGitStatus() {
-        new GPWorker(this) {
+        new Worker(this) {
             boolean updated = false;
 
             @Override
@@ -671,6 +676,9 @@ public class Main extends JFrame {
 
                 // working dir
                 config.curWorkingDir = config.getWorkingDir().getCanonicalPath();
+
+                // parse for project name
+                config.projectName = GitRunner.getProjectName();
 
                 // git branch
                 config.gitBranches = GitRunner.listBranches();
@@ -907,7 +915,7 @@ public class Main extends JFrame {
     }
 
     public void checkoutBranch(String brName) {
-        new GPWorker(this) {
+        new Worker(this) {
             @Override
             protected void doInBackground() throws Exception {
                 GitRunner.checkoutBranch(brName, false);
@@ -922,7 +930,7 @@ public class Main extends JFrame {
     }
 
     public void pull() {
-        new GPWorker(this) {
+        new Worker(this) {
             @Override
             protected void prepare() {
                 super.prepare();
@@ -945,7 +953,7 @@ public class Main extends JFrame {
     }
 
     public void commit() {
-        new GPWorker(this) {
+        new Worker(this) {
             @Override
             protected void prepare() {
                 super.prepare();
@@ -1001,7 +1009,7 @@ public class Main extends JFrame {
     }
 
     public void revertFile(String fName) {
-        new GPWorker(this) {
+        new Worker(this) {
             @Override
             protected void doInBackground() throws Exception {
                 GitRunner.revertFile(fName);
@@ -1016,7 +1024,7 @@ public class Main extends JFrame {
     }
 
     public void deleteFile(String fName) {
-        new GPWorker(this) {
+        new Worker(this) {
             @Override
             protected void doInBackground() throws Exception {
                 GitRunner.deleteFile(fName);

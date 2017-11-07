@@ -12,13 +12,13 @@ import java.util.Properties;
 /**
  * Created by Mike on 2017-06-16.
  */
-public abstract class Config {
+public abstract class MyConfig {
     public final String APP_DIR;
     public final String CONFIG_FILE_NAME;
     public final boolean global;
     public String configComment;
 
-    public Config(String appTag, boolean global){
+    public MyConfig(String appTag, boolean global){
         String tag = appTag.toLowerCase().trim();
         tag = tag.replaceAll("[^a-zA-Z0-9-]", "");
         this.global = global;

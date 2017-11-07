@@ -344,6 +344,24 @@ public class GitRunner {
         file.delete();
     }
 
+    public static String getProjectName() throws IOException {
+        final String result[] = new String[1];
+        final String SLASH = "/";
+        runCommand("git rev-parse --show-toplevel", new CommandOutputParser() {
+            @Override
+            boolean parseOutLine(String line) {
+                int p0 = line.lastIndexOf(SLASH);
+                if (p0 >= 0) {
+                    result[0] = line.substring(p0 + SLASH.length());
+                }
+                return true;
+            }
+        });
+        return result[0];
+    }
+
+    /* ######################################################################################################## */
+
     public static void runCommand(String command, CommandOutputParser outClbk) throws IOException {
         if (validator != null && !validator.preValidateCommand(command))
             return;
