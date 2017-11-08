@@ -657,6 +657,7 @@ public class Main extends JFrame {
 
 
     public void checkGit() {
+        //FIXME: maybe run this asynchronously?
         try {
             dataDone = false;
             String ver = GitRunner.getGitVersion();
@@ -1123,23 +1124,17 @@ public class Main extends JFrame {
             });
             Log.log(os);
             gui.config.loadConfig();    // load stored preferences
-            gui.checkGit();
-            gui.updateGitStatus();
 
             // show GUI
             if (gui.config.windowSize != null) {
+                gui.setLocation(gui.config.windowSize.getLocation());
                 gui.setPreferredSize(gui.config.windowSize.getSize());
             } else {
+                gui.setLocationRelativeTo(null);
                 gui.setPreferredSize(new Dimension(600, 600));
             }
             gui.pack();
-            if (gui.config.windowSize != null) {
-                gui.setLocation(gui.config.windowSize.getLocation());
-            }
-            else{
-                gui.setLocationRelativeTo(null);
-            }
-            //gui.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            gui.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             gui.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
             gui.addWindowListener(new WindowAdapter() {
                 @Override
@@ -1151,7 +1146,11 @@ public class Main extends JFrame {
             });
             gui.setVisible(true);
 
-            // start refresh timer
+            // run async processes to update gui controls
+            gui.checkGit();
+            gui.updateGitStatus();
+
+            // start refresh timer, to check for changes periodically
 //            Timer timer = new Timer(2000, new ActionListener() {
 //                public void actionPerformed(ActionEvent e) {
 //                    gui.updateGitStatus();
@@ -1162,6 +1161,7 @@ public class Main extends JFrame {
         } catch (Exception e) {
             System.err.println("! Critical error");
             e.printStackTrace();
+            System.exit(1);
         }
     }
 }
