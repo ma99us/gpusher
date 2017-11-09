@@ -26,7 +26,7 @@ import java.util.Properties;
 public class Main extends JFrame {
 
     public static final String APP_NAME = "G-Pusher";
-    public static final String APP_VER = "2017.11.08";
+    public static final String APP_VER = "2017.11.09";
 
     class Config extends MyConfig {
         // TODO: maybe store some settings globally, others - store locally, and others - do not store at all.
@@ -683,6 +683,12 @@ public class Main extends JFrame {
                 curBrName += "\t(" + config.curBranch.type + ")";
             curBranchTxt.setText(curBrName);
         }
+        if(config.repoUserId != null){
+            repoCredentialsBtn.setText("Credentials *");
+        }
+        else{
+            repoCredentialsBtn.setText("Credentials");
+        }
         List<String> filesLbls = new ArrayList<String>();
         if (config.filesToAdd != null && !config.filesToAdd.isEmpty())
             filesLbls.add("Files to Add: " + config.filesToAdd.size());
@@ -733,6 +739,10 @@ public class Main extends JFrame {
     public void updateGitStatus() {
         new Worker(this) {
             boolean updated = false;
+
+            protected void prepare() {
+                showProgressDialog(true);
+            }
 
             @Override
             protected void doInBackground() throws Exception {
@@ -931,7 +941,13 @@ public class Main extends JFrame {
 
     public void showRepoCredentialsDialog() {
         JTextField userName = new JTextField();
+        if(config.repoUserId != null){
+            userName.setText(config.repoUserId);
+        }
         JPasswordField userPassword = new JPasswordField();
+        if(config.repoUserPassword != null){
+            userPassword.setText(config.repoUserPassword);
+        }
         final JComponent[] inputs = new JComponent[] {
                 new JLabel("User ID"),
                 userName,
@@ -944,6 +960,7 @@ public class Main extends JFrame {
             String userPasswordStr = new String(userPassword.getPassword()).trim();
             config.repoUserId = !userNameStr.isEmpty() ? userNameStr : null;
             config.repoUserPassword = !userPasswordStr.isEmpty() ? userPasswordStr : null;
+            updateGUI();
         }
     }
 
