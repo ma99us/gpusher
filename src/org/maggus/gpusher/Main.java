@@ -26,11 +26,12 @@ import java.util.Properties;
 public class Main extends JFrame {
 
     public static final String APP_NAME = "G-Pusher";
-    public static final String APP_VER = "2017.11.07";
+    public static final String APP_VER = "2017.11.08";
 
     class Config extends MyConfig {
         // TODO: maybe do not store some settings globally
         String projectName;
+        String repoLocation;
         String curWorkingDir;
         List<GitBranch> gitBranches;
         List<GitFile> gitFiles;
@@ -181,7 +182,7 @@ public class Main extends JFrame {
     JButton checkoutBranchBtn;
     JButton shellBtn;
     JButton pullBtn;
-    //JList changesList;
+    JButton toggleChangesBtn;
     MyList changesList;
     JLabel selectedLbl;
     JTextField curWorkingDirTxt;
@@ -192,6 +193,7 @@ public class Main extends JFrame {
     JTextField newBranchTxt;
     JCheckBox backToOriginalBranchCb;
     JCheckBox pushAfterCommitCb;
+    JTextField remoteRepoTxt;
     JTextPane logTa;
     JButton commitBtn;
 
@@ -210,7 +212,6 @@ public class Main extends JFrame {
         });
 
         curWorkingDirTxt = new JTextField();
-        //curBranchTxt.setEnabled(false);
         curWorkingDirTxt.setEditable(false);
         curWorkingDirTxt.addMouseListener(new MouseAdapter() {      // easter egg / about box
             @Override
@@ -237,7 +238,6 @@ public class Main extends JFrame {
         });
 
         curBranchTxt = new JTextField();
-        //curBranchTxt.setEnabled(false);
         curBranchTxt.setEditable(false);
 
         checkoutBranchBtn = new JButton("Checkout");
@@ -253,6 +253,15 @@ public class Main extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 pull();
+            }
+        });
+
+        toggleChangesBtn = new JButton("Select all modified");
+        toggleChangesBtn.setMargin(new Insets(0, 3, 0, 3));
+        toggleChangesBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                toggleChangesSelection();
             }
         });
 
@@ -401,6 +410,9 @@ public class Main extends JFrame {
         });
 
         newBranchTxt = new JTextField(40);
+        remoteRepoTxt = new JTextField(40);
+        remoteRepoTxt.setEditable(false);
+        //remoteRepoTxt.setBackground(Color.LIGHT_GRAY);
         //curBranchTxt.setEnabled(false);
         //newBranchTxt.setEditable(false);
 
@@ -501,14 +513,22 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.BOTH;
         contentPane.add(changesList, gbc);
 
-        gbc.gridwidth = 5;
+        gbc.gridwidth = 3;
         gbc.gridx = 0;
         gbc.gridy++;
-        gbc.weightx = 0;
+        gbc.weightx = 1.0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(selectedLbl, gbc);
 
+        gbc.anchor = GridBagConstraints.EAST;
+        gbc.gridwidth = 2;
+        gbc.gridx = 3;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(toggleChangesBtn, gbc);
+
+        gbc.anchor = GridBagConstraints.LINE_START;
         gbc.gridwidth = 5;
         gbc.gridx = 0;
         gbc.gridy++;
@@ -550,7 +570,7 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         contentPane.add(newBranchTxt, gbc);
 
-        gbc.gridwidth = 5;
+        gbc.gridwidth = 2;
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.weightx = 0;
@@ -558,13 +578,25 @@ public class Main extends JFrame {
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(pushAfterCommitCb, gbc);
 
-        gbc.gridwidth = 5;
-        gbc.gridx = 0;
-        gbc.gridy++;
+        gbc.gridwidth = 3;
+        gbc.gridx = 2;
+        //gbc.gridy++;
         gbc.weightx = 0;
         gbc.weighty = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(backToOriginalBranchCb, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(new JLabel("Repo location: "), gbc);
+        gbc.gridwidth = 4;
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        contentPane.add(remoteRepoTxt, gbc);
 
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.gridwidth = 5;
@@ -572,7 +604,7 @@ public class Main extends JFrame {
         gbc.gridy++;
         gbc.weightx = 0;
         gbc.weighty = 0;
-        //gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.fill = GridBagConstraints.NONE;
         contentPane.add(commitBtn, gbc);
 
         gbc.anchor = GridBagConstraints.LINE_START;
@@ -594,7 +626,7 @@ public class Main extends JFrame {
 
     private void showAboutDialog() {
         JLabel picLabel = new JLabel(new ImageIcon(Main.class.getResource("yunogit.jpg")));
-        JOptionPane.showMessageDialog(this, picLabel, APP_NAME + " - GIT tool by Mike Gerdov v." + APP_VER, JOptionPane.PLAIN_MESSAGE, null);
+        JOptionPane.showMessageDialog(this, picLabel, APP_NAME + " - GIT helper tool by Mike Gerdov v." + APP_VER, JOptionPane.PLAIN_MESSAGE, null);
     }
 
     public void persist() {
@@ -618,6 +650,9 @@ public class Main extends JFrame {
         if (config.curWorkingDir != null) {
             curWorkingDirTxt.setText(config.curWorkingDir);
         }
+        if(config.repoLocation != null){
+            remoteRepoTxt.setText(config.repoLocation);
+        }
         if (config.curBranch != null) {
             String curBrName = config.curBranch.name;
             if (config.curBranch.type != null)
@@ -630,8 +665,8 @@ public class Main extends JFrame {
         if (config.filesToReset != null && !config.filesToReset.isEmpty())
             filesLbls.add("Files to Reset: " + config.filesToReset.size());
         selectedLbl.setText(MyConfig.listToString(filesLbls, "No files selected"));
-        branchPrefixTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
-        newBranchTxt.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
+        branchPrefixTxt.setEditable(config.commitToNewBranch != null && config.commitToNewBranch);
+        newBranchTxt.setEditable(config.commitToNewBranch != null && config.commitToNewBranch);
         backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
         commitBtn.setEnabled(isCommitAvailable() || isPushAvailable());
         List<String> commitLbls = new ArrayList<String>();
@@ -680,6 +715,9 @@ public class Main extends JFrame {
 
                 // parse for project name
                 config.projectName = GitRunner.getProjectName();
+
+                // parse for remote repo location
+                config.repoLocation = GitRunner.getRemoteRepoLocation();
 
                 // git branch
                 config.gitBranches = GitRunner.listBranches();
@@ -912,6 +950,15 @@ public class Main extends JFrame {
         } catch (Exception ex) {
             ex.printStackTrace();
             Log.log(Log.Level.err, ex.getMessage());
+        }
+    }
+
+    public void toggleChangesSelection(){
+        for(int i=0 ; i < changesList.getModel().getSize(); i++){
+            GitFile f = (GitFile)changesList.getModel().get(i);
+            if(f.type == GitFile.Type.MODIFIED){
+                changesList.setSelectionInterval(i, i);
+            }
         }
     }
 

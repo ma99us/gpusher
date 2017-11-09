@@ -345,19 +345,35 @@ public class GitRunner {
     }
 
     public static String getProjectName() throws IOException {
-        final String result[] = new String[1];
+        final StringBuilder sb = new StringBuilder();
         final String SLASH = "/";
         runCommand("git rev-parse --show-toplevel", new CommandOutputParser() {
             @Override
             boolean parseOutLine(String line) {
                 int p0 = line.lastIndexOf(SLASH);
                 if (p0 >= 0) {
-                    result[0] = line.substring(p0 + SLASH.length());
+                    sb.append(line.substring(p0 + SLASH.length()));
                 }
                 return true;
             }
         });
-        return result[0];
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    public static String getRemoteRepoLocation() throws IOException {
+        final StringBuilder sb = new StringBuilder();
+        runCommand("git remote -v", new CommandOutputParser() {
+            @Override
+            boolean parseOutLine(String line) {
+                int p0 = line.indexOf("\t");
+                int p1 = line.lastIndexOf("(push)");
+                if (p0 >= 0 && p1 >= 0) {
+                    sb.append(line.substring(p0, p1).trim());
+                }
+                return true;
+            }
+        });
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     /* ######################################################################################################## */
