@@ -303,8 +303,9 @@ public class GitRunner {
         runCommand("git commit" + sb.toString(), null);
     }
 
-    public static void push(final String brName) throws IOException {
-        runCommand("git push -u origin \"" + brName + "\"", new CommandOutputParser() {
+    public static void push(String repo, final String brName) throws IOException {
+        repo = repo != null ? repo : "origin";
+        runCommand("git push -u " + repo + " \"" + brName + "\"", new CommandOutputParser() {
             @Override
             public boolean parseOutLine(String line) {
                 if (line.startsWith("Branch " + brName + " set up to track remote branch ")) {
@@ -374,6 +375,25 @@ public class GitRunner {
             }
         });
         return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    public static String buildRepoLocationWithCredentials(String originalRepo, String userId, String userPassword){
+        final String startTag = "://";
+        int p0 = originalRepo.indexOf(startTag);
+        if(p0 < 0){
+            return originalRepo;
+        }
+        p0 += startTag.length();
+        StringBuilder sb = new StringBuilder();
+        sb.append(originalRepo.substring(0, p0));
+        sb.append(userId);
+        if(userPassword != null){
+            sb.append(":");
+            sb.append(userPassword);
+        }
+        sb.append("@");
+        sb.append(originalRepo.substring(p0));
+        return sb.toString();
     }
 
     /* ######################################################################################################## */
@@ -603,7 +623,7 @@ public class GitRunner {
             files.add(new GitFile("test/long file name with spaces.txt"));
             addFiles(files);
             commit("test commit");
-            push("test");
+            push(null, "test");
             System.out.println("listChangedFiles()=" + listChangedFiles());
             System.out.println("*** Done ***");
         } catch (Exception ex) {

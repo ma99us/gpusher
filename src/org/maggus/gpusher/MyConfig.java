@@ -112,7 +112,7 @@ public abstract class MyConfig {
 
     public static void saveValue(Properties props, String tag, Object val){
         if(val == null)
-            return;
+            props.remove(tag);
         else if(val instanceof Boolean)
             props.setProperty(tag, Boolean.toString((Boolean)val));
         else if(val instanceof Long)

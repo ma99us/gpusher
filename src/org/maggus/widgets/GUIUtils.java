@@ -26,4 +26,13 @@ public class GUIUtils {
         root.getActionMap().put(dispatchWindowClosingActionMapKey, dispatchClosing
         );
     }
+
+    static public boolean initNativeLookAndFeel(){
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            return true;
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+            return false;
+        }
+    }
 }

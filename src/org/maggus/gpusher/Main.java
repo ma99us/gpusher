@@ -29,9 +29,11 @@ public class Main extends JFrame {
     public static final String APP_VER = "2017.11.08";
 
     class Config extends MyConfig {
-        // TODO: maybe do not store some settings globally
+        // TODO: maybe store some settings globally, others - store locally, and others - do not store at all.
         String projectName;
         String repoLocation;
+        String repoUserId;
+        String repoUserPassword;
         String curWorkingDir;
         List<GitBranch> gitBranches;
         List<GitFile> gitFiles;
@@ -57,6 +59,8 @@ public class Main extends JFrame {
             branchPrefix = props.getProperty("NEW_BRANCH_PREFIX");
             backToOriginalBranch = parseBoolean(props.getProperty("BACK_TO_ORIGINAL_BRANCH"));
             pushAfterCommit = parseBoolean(props.getProperty("PUSH_AFTER_COMMIT"));
+            repoUserId = props.getProperty("REPO_USER_ID", null);
+            repoUserPassword = props.getProperty("REPO_USER_PASS", null);
             // load window state
             Integer windowX = parseInteger(props.getProperty("WINDOW_X"));
             Integer windowY = parseInteger(props.getProperty("WINDOW_Y"));
@@ -88,6 +92,8 @@ public class Main extends JFrame {
             saveValue(props, "NEW_BRANCH_PREFIX", branchPrefix);
             saveValue(props, "BACK_TO_ORIGINAL_BRANCH", backToOriginalBranch);
             saveValue(props, "PUSH_AFTER_COMMIT", pushAfterCommit);
+            saveValue(props, "REPO_USER_ID", repoUserId);
+            saveValue(props, "REPO_USER_PASS", repoUserPassword);
             // save window state
             if(windowSize != null){
                 saveValue(props, "WINDOW_X", (int)windowSize.getLocation().getX());
@@ -183,6 +189,7 @@ public class Main extends JFrame {
     JButton shellBtn;
     JButton pullBtn;
     JButton toggleChangesBtn;
+    JButton repoCredentialsBtn;
     MyList changesList;
     JLabel selectedLbl;
     JTextField curWorkingDirTxt;
@@ -262,6 +269,15 @@ public class Main extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 toggleChangesSelection();
+            }
+        });
+
+        repoCredentialsBtn = new JButton("Credentials");
+        repoCredentialsBtn.setMargin(new Insets(0, 3, 0, 3));
+        repoCredentialsBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showRepoCredentialsDialog();
             }
         });
 
@@ -592,11 +608,19 @@ public class Main extends JFrame {
         gbc.weightx = 0;
         gbc.fill = GridBagConstraints.NONE;
         contentPane.add(new JLabel("Repo location: "), gbc);
-        gbc.gridwidth = 4;
+
+        gbc.gridwidth = 3;
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         contentPane.add(remoteRepoTxt, gbc);
+
+        gbc.anchor = GridBagConstraints.EAST;
+        gbc.gridwidth = 1;
+        gbc.gridx = 4;
+        gbc.weightx = 0;
+        gbc.fill = GridBagConstraints.NONE;
+        contentPane.add(repoCredentialsBtn, gbc);
 
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.gridwidth = 5;
@@ -668,6 +692,7 @@ public class Main extends JFrame {
         branchPrefixTxt.setEditable(config.commitToNewBranch != null && config.commitToNewBranch);
         newBranchTxt.setEditable(config.commitToNewBranch != null && config.commitToNewBranch);
         backToOriginalBranchCb.setEnabled(config.commitToNewBranch != null && config.commitToNewBranch);
+        repoCredentialsBtn.setEnabled(isRepoCredentialsAvaailable());
         commitBtn.setEnabled(isCommitAvailable() || isPushAvailable());
         List<String> commitLbls = new ArrayList<String>();
         if (config.commitToNewBranch != null && config.commitToNewBranch)
@@ -690,6 +715,9 @@ public class Main extends JFrame {
                 || (!isCommitAvailable() && config.curBranch != null && config.curBranch.type != null && config.curBranch.type == GitBranch.Type.AHEAD));    // no changes to commit, and previous local commits were not pushed yet
     }
 
+    private boolean isRepoCredentialsAvaailable(){
+        return config.repoLocation != null && (config.repoLocation.startsWith("https://") || config.repoLocation.startsWith("http://"));
+    }
 
     public void checkGit() {
         //FIXME: maybe run this asynchronously?
@@ -901,6 +929,24 @@ public class Main extends JFrame {
         }
     }
 
+    public void showRepoCredentialsDialog() {
+        JTextField userName = new JTextField();
+        JPasswordField userPassword = new JPasswordField();
+        final JComponent[] inputs = new JComponent[] {
+                new JLabel("User ID"),
+                userName,
+                new JLabel("Password"),
+                userPassword
+        };
+        int result = JOptionPane.showConfirmDialog(this, inputs, "Input Remote Repository Credentials", JOptionPane.PLAIN_MESSAGE);
+        if (result == JOptionPane.OK_OPTION) {
+            String userNameStr = userName.getText().trim();
+            String userPasswordStr = new String(userPassword.getPassword()).trim();
+            config.repoUserId = !userNameStr.isEmpty() ? userNameStr : null;
+            config.repoUserPassword = !userPasswordStr.isEmpty() ? userPasswordStr : null;
+        }
+    }
+
     public void showCheckoutDialog() {
         try {
             DefaultListModel branchesModel = new DefaultListModel<GitBranch>();
@@ -1037,7 +1083,11 @@ public class Main extends JFrame {
 
                 // push to remote repo if needed
                 if (isPushAvailable()) {
-                    GitRunner.push(workBranch.name);
+                    String repo = null;
+                    if(isRepoCredentialsAvaailable() && config.repoUserId != null){
+                        repo = GitRunner.buildRepoLocationWithCredentials(config.repoLocation, config.repoUserId, config.repoUserPassword);
+                    }
+                    GitRunner.push(repo, workBranch.name);
                 }
 
                 // checkout original branch if needed
@@ -1157,12 +1207,9 @@ public class Main extends JFrame {
                 throw new IllegalArgumentException("Running on unsupported OS");
             }
 
-//            try {
-//                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-//            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
-//            }
+            // initNativeLookAndFeel();
 
-            final Main gui = new Main();      // create GUI
+            final Main gui = new Main();      // create GUI window
             Log.setLogListener(new LogListener() {
                 @Override
                 public void onLog(Log.Level lvl, String message) {
